@@ -1,0 +1,15 @@
+[package]
+name = "spike-typst-lib"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Prototype (a), moteur E3 en biblioth?que, hors du build du produit (CODING_RULES.md ?1.1).
+[workspace]
+
+[dependencies]
+comemo = "0.5.1"
+typst = "0.15.1"
+typst-kit = "0.15.1"
+typst-layout = "0.15.1"
+typst-pdf = "0.15.1"
