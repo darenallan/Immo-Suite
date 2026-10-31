@@ -133,7 +133,7 @@ flowchart LR
 | Étape | Statut | Début | Fin | Écarts constatés |
 |---|---|---|---|---|
 | 00 | **Terminée** (validée par Mimis le 31/10/2026 : décisions DP-76 à DP-81, impression papier du PDF validée). **Deux éléments reportés** : mesure réseau (e), faite plus tard par Mimis à Ouagadougou (DP-75), et révocation des clés Neon et AI Gateway, faite par Mimis en fin de projet de prototypes | 31/10/2026 | 31/10/2026 | Neon gratuit (DP-69) ; fichiers en stockage objet et PDF émis conservés (DP-70, DP-71) ; Rust GNU et pas de Docker (poste) ; moteur PDF Typst (DP-76), `OrgTx` seul mécanisme (DP-77), rôle `immo_backup` confirmé (DP-78), numérotation (DP-79), import (DP-80), montant en lettres (DP-81) ; 197 locataires sur 36 lots dans le fichier de référence : question ouverte (R-020, `DOMAINE.md`) ; deux incidents d'outillage (arrêt d'un conhost, arrêt de processus par parenté de PID) corrigés dans `spikes/tools/` ; CU-heures Neon non relevées |
-| 01 | À faire | | | |
+| 01 | En cours : fiche `specs/F39-sauvegardes.md` rédigée le 31/10/2026, **en attente de validation de Mimis** ; l'exécution est bloquée par C-01, C-02, C-03 et par l'absence de Docker sur le poste | 31/10/2026 | | Objectifs de sauvegarde adaptés par DP-69 (6 heures, perte maximale de 24 heures) |
 | 02 | À faire | | | |
 | 03 | À faire | | | |
 | 04 | À faire | | | |
