@@ -8,5 +8,6 @@ pub mod clock;
 pub mod config;
 pub mod db;
 pub mod file_store;
+pub mod jobs;
 pub mod mailer;
 pub mod pdf;

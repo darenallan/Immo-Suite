@@ -17,3 +17,4 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "sy
 uuid = { version = "1", features = ["v4"] }
 age = "0.12"
 serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["std"] }

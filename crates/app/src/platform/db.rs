@@ -52,6 +52,14 @@ impl Db {
         OrgTx::begin(self, org_id, user_id).await
     }
 
+    /// Transaction sans contexte d'organisation, pour les tables globales (`jobs`, `sessions`). Réservée à `platform` :
+    /// sur une table sous RLS, l'absence de contexte ne renvoie aucune ligne.
+    pub(crate) async fn begin_system(&self) -> Result<SystemTx, DbError> {
+        Ok(SystemTx {
+            tx: self.pool.begin().await?,
+        })
+    }
+
     /// Le pool brut, pour les tests d'étanchéité qui doivent reproduire des erreurs d'usage (variante de session).
     #[doc(hidden)]
     pub fn raw_pool_for_tests(&self) -> &PgPool {
@@ -59,10 +67,27 @@ impl Db {
     }
 }
 
+/// Transaction sans organisation (tables globales). Visible seulement dans la caisse : jamais pour des données d'organisation.
+#[derive(Debug)]
+pub(crate) struct SystemTx {
+    tx: Transaction<'static, Postgres>,
+}
+
+impl SystemTx {
+    pub(crate) fn conn(&mut self) -> &mut PgConnection {
+        &mut self.tx
+    }
+
+    pub(crate) async fn commit(self) -> Result<(), DbError> {
+        self.tx.commit().await.map_err(DbError::from)
+    }
+}
+
 /// Transaction qui porte le contexte d'organisation. Seul moyen de lire ou d'écrire des données d'une organisation.
 #[derive(Debug)]
 pub struct OrgTx {
     tx: Transaction<'static, Postgres>,
+    org_id: Uuid,
 }
 
 impl OrgTx {
@@ -75,7 +100,12 @@ impl OrgTx {
             .bind(org_id.to_string())
             .bind(user_id.to_string());
         query.execute(&mut *tx).await?;
-        Ok(Self { tx })
+        Ok(Self { tx, org_id })
+    }
+
+    /// L'organisation du contexte posé.
+    pub fn org_id(&self) -> Uuid {
+        self.org_id
     }
 
     /// La connexion de la transaction, pour exécuter des requêtes dans le contexte posé.

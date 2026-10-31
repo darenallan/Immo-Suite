@@ -1,6 +1,7 @@
 //! Binaire `immo` : `immo serve`, `immo version`, `immo openapi`, `immo backup …` (F39). Les autres commandes d'exploitation (`org`, `demo`) arrivent ensuite.
 
 mod backup_cli;
+mod worker;
 
 use std::io::Write;
 use std::net::SocketAddr;
@@ -36,13 +37,17 @@ async fn main() -> ExitCode {
             None => write_stdout(&openapi::openapi_json()),
         },
         Some("serve") => serve().await,
+        Some("work") => {
+            init_tracing();
+            worker::run().await
+        }
         Some("backup") => {
             init_tracing();
             let args: Vec<String> = std::env::args().skip(2).collect();
             backup_cli::run(&args).await
         }
         _ => {
-            let _ = std::io::stderr().write_all(b"usage : immo serve | version | openapi | backup\n");
+            let _ = std::io::stderr().write_all(b"usage : immo serve | version | openapi | backup | work\n");
             ExitCode::from(2)
         }
     }

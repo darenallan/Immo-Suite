@@ -1364,6 +1364,7 @@ dependencies = [
  "sqlx",
  "thiserror 2.0.21",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -1372,6 +1373,7 @@ name = "immo-db-tests"
 version = "0.0.0"
 dependencies = [
  "age",
+ "chrono",
  "immo-app",
  "serde_json",
  "sqlx",
