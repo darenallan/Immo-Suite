@@ -43,3 +43,7 @@ Thumbs.db
 /spikes/pdf/cases/
 /spikes/pdf/assets/
 /spikes/pdf/fonts/static/
+
+# Sorties de test du front
+/web/playwright-report/
+/web/test-results/

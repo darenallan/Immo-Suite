@@ -1,0 +1,47 @@
+{
+  "name": "immo-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "size": "npm run build && size-limit",
+    "api:types": "openapi-typescript ../openapi.json -o src/api/schema.d.ts",
+    "api:check": "openapi-typescript ../openapi.json -o src/api/schema.generated.d.ts && node scripts/same-file.mjs src/api/schema.d.ts src/api/schema.generated.d.ts"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@playwright/test": "1.64.1",
+    "@size-limit/file": "14.3.0",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "eslint": "9.39.5",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "jsdom": "30.1.3",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.10",
+    "size-limit": "14.3.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}
