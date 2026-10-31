@@ -1,0 +1,45 @@
+# Dossiers marketing et supports (DP-73) : hors du dépôt de code, non supprimés
+/film/
+/flyer/
+/infographie/
+/site/
+/logo/
+
+# Outils et sorties de compilation
+.venv/
+venv/
+node_modules/
+target/
+__pycache__/
+*.pyc
+dist/
+coverage/
+
+# Captures de la maquette
+/maquette/_captures/
+
+# Secrets et environnement local : jamais dans le dépôt
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+
+# Fichiers temporaires du poste
+*.log
+*.tmp
+Thumbs.db
+.DS_Store
+~$*
+
+# Données de prototypes : créées en local, jamais versées
+/spikes/**/data/
+/spikes/**/out/
+
+# Générés par les scripts des prototypes (régénérables, voir spikes/*/README.md)
+/spikes/import/fixtures/
+/spikes/pdf/build/
+/spikes/pdf/cases/
+/spikes/pdf/assets/
+/spikes/pdf/fonts/static/
