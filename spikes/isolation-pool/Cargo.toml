@@ -1,0 +1,13 @@
+[package]
+name = "spike-isolation-pool"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Prototype (b), hors du build du produit (CODING_RULES.md §1.1) : espace de travail propre.
+[workspace]
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "process", "fs", "sync"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-native-tls", "postgres"] }
+uuid = { version = "1", features = ["v4"] }
