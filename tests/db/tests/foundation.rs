@@ -203,6 +203,26 @@ async fn immo_backup_lit_toutes_les_tables_y_compris_les_nouvelles() {
             r.get::<String, _>("n")
         );
     }
+    // les séquences aussi (colonnes d'identité) : pg_dump échoue sans ce droit (constaté par le test de sauvegarde)
+    db.owner.execute("CREATE TABLE table_avec_identite (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, org_id uuid NOT NULL)").await.unwrap();
+    let seqs = sqlx::query(
+        "SELECT c.relname::text AS n, has_sequence_privilege('immo_backup', c.oid, 'SELECT') AS ok
+           FROM pg_class c JOIN pg_namespace ns ON ns.oid = c.relnamespace WHERE ns.nspname = 'public' AND c.relkind = 'S'",
+    )
+    .fetch_all(&db.admin)
+    .await
+    .unwrap();
+    assert!(
+        seqs.len() >= 2,
+        "séquences attendues : platform_events_id_seq et table_avec_identite_id_seq"
+    );
+    for r in seqs {
+        assert!(
+            r.get::<bool, _>("ok"),
+            "immo_backup ne peut pas lire la séquence {}",
+            r.get::<String, _>("n")
+        );
+    }
     // et il contourne la RLS : il lit une table à RLS forcée sans contexte
     db.owner
         .execute("ALTER TABLE table_ajoutee_plus_tard ENABLE ROW LEVEL SECURITY")

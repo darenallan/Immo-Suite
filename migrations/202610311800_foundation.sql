@@ -5,6 +5,8 @@ SET lock_timeout = '5s';
 
 -- DP-78 : toute table créée ensuite par immo_owner est lisible par immo_backup (pg_dump échoue sans ce droit).
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO immo_backup;
+-- pg_dump lit aussi les séquences (colonnes d'identité) : constaté par le test de sauvegarde de l'étape 01.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON SEQUENCES TO immo_backup;
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
@@ -104,3 +106,4 @@ GRANT SELECT ON purge_order TO immo_platform;
 
 -- DP-78 : immo_backup lit tout, y compris les tables créées avant l'ALTER DEFAULT PRIVILEGES (journal des migrations de SQLx).
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO immo_backup;
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO immo_backup;

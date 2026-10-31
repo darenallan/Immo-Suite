@@ -106,6 +106,10 @@ pub struct TestDb {
     pub backup: PgPool,
     /// URL du rôle applicatif (`immo_app`), pour `Db::connect`.
     pub app_url: String,
+    /// URL du rôle de sauvegarde (immo_backup).
+    pub backup_url: String,
+    /// URL du rôle de la console (immo_platform).
+    pub platform_url: String,
     maintenance: PgPool,
 }
 
@@ -205,6 +209,8 @@ impl TestDb {
             platform: pool("immo_platform", &s.pw_platform),
             backup: pool("immo_backup", &s.pw_backup),
             app_url: url(s, "immo_app", &s.pw_app, &name),
+            backup_url: url(s, "immo_backup", &s.pw_backup, &name),
+            platform_url: url(s, "immo_platform", &s.pw_platform, &name),
             admin,
             maintenance,
             name,
@@ -225,6 +231,40 @@ impl TestDb {
             .connect_with(options(s, "immo_app", Some(&s.pw_app), &self.name))
             .await
             .expect("immo_app")
+    }
+
+    /// Crée une base vide supplémentaire (cible d'une restauration) et renvoie son URL d'administration.
+    pub async fn create_empty_database(&self, name: &str) -> String {
+        let s = srv().await;
+        self.maintenance
+            .execute(sqlx::AssertSqlSafe(format!("CREATE DATABASE {name}")))
+            .await
+            .expect("CREATE DATABASE");
+        let auth = match &s.password {
+            Some(p) => format!("{}:{p}", s.user),
+            None => s.user.clone(),
+        };
+        format!("postgres://{auth}@{}:{}/{name}", s.host, s.port)
+    }
+
+    /// Supprime une base créée par `create_empty_database`.
+    pub async fn drop_database(&self, name: &str) {
+        let _ = self
+            .maintenance
+            .execute(sqlx::AssertSqlSafe(format!(
+                "DROP DATABASE IF EXISTS {name} WITH (FORCE)"
+            )))
+            .await;
+    }
+
+    /// Pool d'administration sur une autre base du serveur.
+    pub async fn admin_pool_for(&self, name: &str) -> PgPool {
+        let s = srv().await;
+        PgPoolOptions::new()
+            .max_connections(2)
+            .connect_with(options(s, &s.user, s.password.as_deref(), name))
+            .await
+            .expect("administrateur")
     }
 
     /// Supprime la base jetable.

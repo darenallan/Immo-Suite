@@ -3,6 +3,7 @@
 //! Les lints de `clippy.toml` interdisent `PgPool`, `PgConnection` et la lecture directe de l'heure ailleurs ;
 //! les `#[allow]` de ce module portent un commentaire qui cite la raison (décision n° 75).
 
+pub mod backup;
 pub mod clock;
 pub mod config;
 pub mod db;
