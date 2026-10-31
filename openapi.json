@@ -1,0 +1,78 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Immo Suite API",
+    "description": "Contrat d'API d'Immo Suite (étape 01 : /health et /ready seulement)",
+    "license": {
+      "name": "Propriétaire, tous droits réservés"
+    },
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "crate::http"
+        ],
+        "summary": "Sonde externe : répond `{\"status\":\"ok\"}` et rien d'autre (API_CONTRACTS.md §7.17).",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Le service répond",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "crate::http"
+        ],
+        "summary": "Disponibilité de la base et du stockage, réservée au réseau interne : 404 depuis l'extérieur, 503 si une ressource manque.",
+        "operationId": "ready",
+        "responses": {
+          "200": {
+            "description": "Base et stockage disponibles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hors réseau interne"
+          },
+          "503": {
+            "description": "Une ressource manque"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "StatusBody": {
+        "type": "object",
+        "description": "Réponse de `/health`.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Toujours `ok` ; aucune donnée."
+          }
+        }
+      }
+    }
+  }
+}

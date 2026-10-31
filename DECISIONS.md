@@ -949,6 +949,15 @@ Les entrées DP-52 à DP-68 viennent de l'audit `AUDIT_COHERENCE_2.md` (30/10/20
 - **Statut** : Prise (délégation de Mimis à Claude Code, 31/10/2026), à relire
 - **Liens** : décisions n° 88, 89, 92 ; DP-55, DP-56 ; `DEPLOYMENT.md` §2.3, §2.4, §7.3.
 
+### DP-84 — Outils du contrat d'API (`CODING_RULES.md` question 6)
+
+- **Date** : 31/10/2026
+- **Contexte** : étape 01 §5.3 : générer le contrat OpenAPI depuis le code, le versionner, détecter les ruptures, produire le client TypeScript dans le même commit.
+- **Décision** (par délégation de Mimis, à relire) : **`utoipa`** génère `openapi.json` depuis les annotations des routes Rust ; un test de fraîcheur compare le fichier versionné à la sortie de `immo openapi` ; **`oasdiff`** (binaire unique, en CI) compare le contrat à celui de la branche principale et fait échouer la CI sur une rupture non annoncée ; **`openapi-typescript`** produit `web/src/api/generated/` (étape 5.4). Le journal d'accès utilise `tracing` en JSON avec une liste blanche de champs ; l'identifiant de requête est un UUID renvoyé dans `X-Request-Id`.
+- **Alternatives écartées** : contrat écrit à la main (dérive du code) ; génération du code Rust depuis le contrat (inverse la source de vérité) ; `aide` (moins répandu).
+- **Conséquences** : `openapi.json` à la racine, régénéré par `immo openapi openapi.json` ; une route sans annotation est invisible du contrat : le test de couverture de la liste des routes (étape suivante) compare les routes du routeur au contrat. `/ready` est annoncé au contrat mais réservé au réseau interne (404 hors réseau interne ou relayé).
+- **Statut** : Prise (délégation de Mimis à Claude Code, 31/10/2026), à relire
+- **Liens** : DP-67 ; `API_CONTRACTS.md` §7.17 ; `CODING_RULES.md` question 6.
 ## Décisions ouvertes
 
 Les 15 décisions de la section 26 du dossier, plus trois ajoutées hors dossier (n° 16 à 18). La colonne « Recommandation du dossier » n'est **pas** une décision. Sont prises : n° 1 (DP-28, puis DP-34, puis DP-52 et DP-53), 2, 4, 6, 7 (DP-76), 8, 9, 10, 14, 16, 18, 19, 20, 21, 23, 25, 27, 30, 31, 32, 34, 35, 36, 40, 41, 46 (confirmée, DP-78), 50, 51, 55, 60, 61, 62, 64, 67, 69, 70, 73 à 77, 79, 80 et 87 (voir la colonne Statut). Les autres sont **Ouvertes**. Prises ensuite (étape 01) : n° 24, 53, 95 (DP-82) et n° 88, 89, 92 (DP-83).

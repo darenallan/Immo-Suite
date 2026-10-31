@@ -1,12 +1,34 @@
 [package]
 name = "immo-server"
 version = "0.0.0"
+description = "Binaire `immo` : serveur HTTP, ligne de commande d'exploitation, travailleur de fond"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
+
 [lints]
 workspace = true
+
+[lib]
+name = "immo_server"
+path = "src/lib.rs"
+
 [[bin]]
 name = "immo"
 path = "src/main.rs"
+
+[dependencies]
+immo-app = { path = "../app" }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "json", "env-filter", "std", "registry"] }
+utoipa = "5"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

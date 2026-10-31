@@ -7,7 +7,13 @@
 //! (absent), `PSQL` (chemin de psql, défaut `psql`).
 
 // Banc de test : l'accès direct au pool et aux requêtes est nécessaire pour reproduire les erreurs d'usage que les lints interdisent.
-#![allow(clippy::disallowed_methods, clippy::disallowed_types, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic
+)]
 
 use std::path::{Path, PathBuf};
 
@@ -16,8 +22,17 @@ use sqlx::{Executor, PgPool, Row};
 use tokio::sync::OnceCell;
 
 /// Tables globales sans `org_id` ni RLS (DATABASE_SCHEMA.md §6.5) ; `_sqlx_migrations` est le journal des migrations.
-pub const GLOBAL_TABLES: [&str; 9] =
-    ["users", "sessions", "login_attempts", "password_resets", "platform_staff", "platform_events", "purge_order", "jobs", "_sqlx_migrations"];
+pub const GLOBAL_TABLES: [&str; 9] = [
+    "users",
+    "sessions",
+    "login_attempts",
+    "password_resets",
+    "platform_staff",
+    "platform_events",
+    "purge_order",
+    "jobs",
+    "_sqlx_migrations",
+];
 
 /// Tables avec `org_id` facultatif, sans RLS (DATABASE_SCHEMA.md §6.5).
 pub const OPTIONAL_ORG_TABLES: [&str; 2] = ["sessions", "jobs"];
@@ -63,7 +78,11 @@ async fn srv() -> &'static Server {
 }
 
 fn options(s: &Server, user: &str, password: Option<&str>, db: &str) -> PgConnectOptions {
-    let mut o = PgConnectOptions::new().host(&s.host).port(s.port.parse().unwrap()).username(user).database(db);
+    let mut o = PgConnectOptions::new()
+        .host(&s.host)
+        .port(s.port.parse().unwrap())
+        .username(user)
+        .database(db);
     if let Some(p) = password {
         o = o.password(p);
     }
@@ -102,17 +121,66 @@ impl TestDb {
     pub async fn create_without_migrations() -> TestDb {
         let s = srv().await;
         let name = format!("immo_test_{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
-        let maintenance = PgPoolOptions::new().max_connections(2).connect_with(options(s, &s.user, s.password.as_deref(), "postgres")).await.expect("connexion d'administration");
-        maintenance.execute(sqlx::AssertSqlSafe(format!("CREATE DATABASE {name}"))).await.expect("CREATE DATABASE");
-        let admin = PgPoolOptions::new().max_connections(2).connect_with(options(s, &s.user, s.password.as_deref(), &name)).await.expect("administrateur");
+        let maintenance = PgPoolOptions::new()
+            .max_connections(2)
+            .connect_with(options(s, &s.user, s.password.as_deref(), "postgres"))
+            .await
+            .expect("connexion d'administration");
+        // Nettoyage, une fois par exécution : les bases jetables orphelines (test interrompu) sans connexion active sont supprimées.
+        static CLEANED: OnceCell<()> = OnceCell::const_new();
+        CLEANED
+            .get_or_init(|| async {
+                let stale: Vec<String> = sqlx::query_scalar(
+                    "SELECT d.datname::text FROM pg_database d WHERE d.datname LIKE 'immo\\_test\\_%'
+                        AND NOT EXISTS (SELECT 1 FROM pg_stat_activity a WHERE a.datname = d.datname)",
+                )
+                .fetch_all(&maintenance)
+                .await
+                .unwrap_or_default();
+                for db in stale {
+                    let _ = maintenance
+                        .execute(sqlx::AssertSqlSafe(format!(
+                            "DROP DATABASE IF EXISTS {db} WITH (FORCE)"
+                        )))
+                        .await;
+                }
+            })
+            .await;
+        maintenance
+            .execute(sqlx::AssertSqlSafe(format!("CREATE DATABASE {name}")))
+            .await
+            .expect("CREATE DATABASE");
+        let admin = PgPoolOptions::new()
+            .max_connections(2)
+            .connect_with(options(s, &s.user, s.password.as_deref(), &name))
+            .await
+            .expect("administrateur");
 
         // Les rôles sont créés par le vrai script d'exploitation, avec psql (variables `-v`).
         let roles = repo_root().join("ops/sql/roles.sql");
         static ROLES_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
         let _guard = ROLES_LOCK.lock().await; // les rôles sont communs au serveur : une exécution à la fois
         let mut cmd = tokio::process::Command::new(&s.psql);
-        cmd.args(["-X", "-q", "-v", "ON_ERROR_STOP=1", "-h", &s.host, "-p", &s.port, "-U", &s.user, "-d", &name]);
-        for (k, v) in [("owner_pw", &s.pw_owner), ("app_pw", &s.pw_app), ("platform_pw", &s.pw_platform), ("backup_pw", &s.pw_backup)] {
+        cmd.args([
+            "-X",
+            "-q",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-h",
+            &s.host,
+            "-p",
+            &s.port,
+            "-U",
+            &s.user,
+            "-d",
+            &name,
+        ]);
+        for (k, v) in [
+            ("owner_pw", &s.pw_owner),
+            ("app_pw", &s.pw_app),
+            ("platform_pw", &s.pw_platform),
+            ("backup_pw", &s.pw_backup),
+        ] {
             cmd.args(["-v", &format!("{k}={v}")]);
         }
         cmd.arg("-f").arg(&roles);
@@ -120,10 +188,18 @@ impl TestDb {
             cmd.env("PGPASSWORD", p);
         }
         let out = cmd.output().await.expect("psql introuvable : définir PSQL");
-        assert!(out.status.success(), "roles.sql a échoué : {}", String::from_utf8_lossy(&out.stderr));
+        assert!(
+            out.status.success(),
+            "roles.sql a échoué : {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         drop(_guard);
 
-        let pool = |user: &str, pw: &str| PgPoolOptions::new().max_connections(4).connect_lazy_with(options(s, user, Some(pw), &name));
+        let pool = |user: &str, pw: &str| {
+            PgPoolOptions::new()
+                .max_connections(4)
+                .connect_lazy_with(options(s, user, Some(pw), &name))
+        };
         TestDb {
             owner: pool("immo_owner", &s.pw_owner),
             platform: pool("immo_platform", &s.pw_platform),
@@ -144,7 +220,11 @@ impl TestDb {
     /// Un pool pour le rôle applicatif.
     pub async fn app_pool(&self, max: u32) -> PgPool {
         let s = srv().await;
-        PgPoolOptions::new().max_connections(max).connect_with(options(s, "immo_app", Some(&s.pw_app), &self.name)).await.expect("immo_app")
+        PgPoolOptions::new()
+            .max_connections(max)
+            .connect_with(options(s, "immo_app", Some(&s.pw_app), &self.name))
+            .await
+            .expect("immo_app")
     }
 
     /// Supprime la base jetable.
@@ -153,7 +233,13 @@ impl TestDb {
         self.platform.close().await;
         self.backup.close().await;
         self.admin.close().await;
-        let _ = self.maintenance.execute(sqlx::AssertSqlSafe(format!("DROP DATABASE IF EXISTS {} WITH (FORCE)", self.name))).await;
+        let _ = self
+            .maintenance
+            .execute(sqlx::AssertSqlSafe(format!(
+                "DROP DATABASE IF EXISTS {} WITH (FORCE)",
+                self.name
+            )))
+            .await;
     }
 }
 
@@ -176,7 +262,8 @@ pub async fn schema_audit(pool: &PgPool) -> Vec<String> {
     let mut errors = vec![];
     for r in rows {
         let name: String = r.get("name");
-        let (rls, forced, has_org, policies): (bool, bool, bool, i64) = (r.get("rls"), r.get("forced"), r.get("has_org"), r.get("policies"));
+        let (rls, forced, has_org, policies): (bool, bool, bool, i64) =
+            (r.get("rls"), r.get("forced"), r.get("has_org"), r.get("policies"));
         let protected = rls && forced && policies > 0;
         if name == ORG_ROOT_TABLE {
             if !protected {
@@ -184,10 +271,16 @@ pub async fn schema_audit(pool: &PgPool) -> Vec<String> {
             }
         } else if !has_org {
             if !GLOBAL_TABLES.contains(&name.as_str()) {
-                errors.push(format!("{name} : table sans org_id absente de la liste blanche des tables globales"));
+                errors.push(format!(
+                    "{name} : table sans org_id absente de la liste blanche des tables globales"
+                ));
             }
         } else if !OPTIONAL_ORG_TABLES.contains(&name.as_str()) && !protected {
-            errors.push(format!("{name} : org_id présent mais RLS {}, forcée {}, politiques {policies}", yn(rls), yn(forced)));
+            errors.push(format!(
+                "{name} : org_id présent mais RLS {}, forcée {}, politiques {policies}",
+                yn(rls),
+                yn(forced)
+            ));
         }
     }
     errors
