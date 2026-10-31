@@ -1,29 +1,20 @@
-# Étape 00 — Note de reprise (31/10/2026, fin de séance)
+# Note de reprise (31/10/2026, étape 00 close, étape 01 en cours)
 
 À lire en premier après un `/clear`. Ne contient aucun secret.
 
 ## Où on en est
 
-Protocoles validés par Mimis le 31/10/2026 ; prototypes **exécutés**, notes rédigées dans `spikes/*/NOTE.md` (section 8 de chacune), **décisions proposées en attente de validation de Mimis**. Rien n'est encore écrit dans `DECISIONS.md` pour les prototypes (règle : valider d'abord). **Aucun commit** : dépôt Git initialisé, `spikes/` et les documents non suivis. Identité Git locale : `hassanhabek <Hassan@habek.cc>` (configurée dans le dépôt, pas en global).
-
-| Prototype | État | Résultat principal |
-|---|---|---|
-| (b) Isolation avec pool | **fait** (local et Neon) | 0 lecture croisée sur 10 000 itérations (Neon, 4 467 s) ; T4 fuit comme prévu ; pg_dump sous RLS forcée : seul un rôle BYPASSRLS réussit (créable en SQL sur Neon) ; pg_restore vers un second projet : comptes identiques ; restauration à T0 : 100 lignes sur 150, branche créée en 1,9 s ; surcoût : l'aller-retour réseau domine (OrgTx = +4 allers-retours) |
-| (c) Numérotation | local et Neon faits | 0 trou, 0 doublon, 0 interblocage sur 19 110 quittances ; idempotence 100/100 ; E-10 et E-27 reproduits |
-| (a) PDF | mesuré, **impression papier à faire par Mimis** | trois moteurs tiennent les 20 cas ; Typst en bibliothèque proposé (3 ms, 17 Mo, reproductible) ; montant en lettres : 22 011 valeurs concordantes |
-| (d) Import | **fait** (local et comptage sur Neon) | 31/31 fichiers conformes, 197 créables et 3 erreurs aux lignes 14, 87, 152, 8 fichiers piégés neutralisés ; constat : 197 locataires sur 36 lots (R-020) |
-| (e) Réseau | **non fait** (DP-75) : Mimis mesure à Ouagadougou | — |
+- **Étape 00 terminée** : décisions DP-76 à DP-84 écrites, documents corrigés, résultats dans `spikes/*/NOTE.md` (section 8). Identité Git locale : `Hassan <Hassan@habek.cc>`. Les commits sont locaux (pas de dépôt distant).
+- **Étape 01 en cours** (`ROADMAP.md` §4). Faits et testés localement : fondation (horloge, configuration, `OrgTx`, stockage de fichiers), migration de fondation, rôles SQL (`ops/sql/roles.sql`), 12 tests de base, serveur `/health` et `/ready`, journal JSON, contrat OpenAPI généré, **module de sauvegarde F39** (copie `pg_dump` par `immo_backup`, chiffrement `age` à clé publique, manifeste SHA-256, vérification, restauration chronométrée, alertes) et **commande `immo backup keygen|run|list|verify [--deep]|check|restore`**, éprouvée sur un scénario réel (copie, vérification, restauration, altération détectée, alerte de copie absente).
+- **Reste à faire** à l'étape 01 : file de tâches, CI (rapide, intégration, nocturne), `deny.toml`, image Docker et Compose, scripts de déploiement, front `web/`, squelette du moteur PDF isolé. **Bloqué** par C-01 (comptes), C-02 (hébergement, second fournisseur en écriture seule), C-03 (domaine) et par l'absence de Docker.
 
 ## Ce que Mimis doit faire (reste ouvert)
 
-1. **Valider ou refuser** chaque décision proposée (section « Décision proposée » de chaque note), en particulier : moteur PDF (n° 7), rôle de sauvegarde avec `BYPASSRLS` (n° 46), règles d'import de la section 8.3 de la note (d), règles d'accord du montant en lettres (note a, 8.3).
-2. **Imprimer** sur l'imprimante laser noir et blanc les PDF de `spikes/pdf/build/e3-cli/` (cas 01 accents, 06 maximum, 13 annulée, en A4 et A5), depuis le PDF puis depuis un aperçu HTML.
-3. **Mesure réseau** à Ouagadougou (DP-75), deux vagues à valider.
-4. **En fin d'étape** : révoquer dans la console Neon la clé d'API `napi_…` (collée dans le chat le 31/10/2026) et les deux jetons AI Gateway ; détruire ou archiver les projets Neon `immo-spikes` et `immo-spikes-restore`.
-
-## Ce que Claude fait ensuite
-
-Après validation : écrire les entrées `DP-xx` dans `DECISIONS.md` ; corriger les écarts listés dans DP-69 et DP-71 (`DEPLOYMENT.md` §4.1 et §10, `ARCHITECTURE.md` §3.10 et §10.4, `SECURITY.md` §5.3, `TESTING_QA.md` §6, `ROADMAP.md` J0) ; inventorier les 44 tests de `DATABASE_SCHEMA.md` §9.4 ; mettre à jour `ROADMAP.md` §4 et la section « commandes » de `CLAUDE.md` ; premier commit (un commit par intention, identifiants DP-xx) ; dérouler la liste de démonstration ; **ne pas commencer l'étape 01 sans demande**.
+1. Fournir C-01, C-02, C-03 (voir `ROADMAP.md` §6) ; choisir le second fournisseur de copies.
+2. Générer et garder en **deux exemplaires** la clé privée de sauvegarde : `immo backup keygen <fichier>` (la clé publique s'affiche, la privée va dans le fichier, hors du dépôt et hors du serveur).
+3. Révoquer dans la console Neon la clé d'API `napi_…` et les deux jetons AI Gateway collés dans le chat ; détruire ou archiver les projets Neon `immo-spikes` et `immo-spikes-restore`.
+4. Mesure réseau à Ouagadougou (DP-75), quand il le pourra.
+5. Relire les choix délégués de DP-83.
 
 ## Règles d'exploitation (à respecter)
 

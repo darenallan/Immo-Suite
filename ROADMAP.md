@@ -133,7 +133,7 @@ flowchart LR
 | Étape | Statut | Début | Fin | Écarts constatés |
 |---|---|---|---|---|
 | 00 | **Terminée** (validée par Mimis le 31/10/2026 : décisions DP-76 à DP-81, impression papier du PDF validée). **Deux éléments reportés** : mesure réseau (e), faite plus tard par Mimis à Ouagadougou (DP-75), et révocation des clés Neon et AI Gateway, faite par Mimis en fin de projet de prototypes | 31/10/2026 | 31/10/2026 | Neon gratuit (DP-69) ; fichiers en stockage objet et PDF émis conservés (DP-70, DP-71) ; Rust GNU et pas de Docker (poste) ; moteur PDF Typst (DP-76), `OrgTx` seul mécanisme (DP-77), rôle `immo_backup` confirmé (DP-78), numérotation (DP-79), import (DP-80), montant en lettres (DP-81) ; 197 locataires sur 36 lots dans le fichier de référence : question ouverte (R-020, `DOMAINE.md`) ; deux incidents d'outillage (arrêt d'un conhost, arrêt de processus par parenté de PID) corrigés dans `spikes/tools/` ; CU-heures Neon non relevées |
-| 01 | En cours : fiche `specs/F39-sauvegardes.md` rédigée le 31/10/2026, **en attente de validation de Mimis** ; l'exécution est bloquée par C-01, C-02, C-03 et par l'absence de Docker sur le poste | 31/10/2026 | | Objectifs de sauvegarde adaptés par DP-69 (6 heures, perte maximale de 24 heures) |
+| 01 | En cours : fiche F39 validée (DP-82) ; fondation, tests de base, serveur, module et commande `immo backup` faits et éprouvés en local (31/10/2026) ; restent file de tâches, CI, image, déploiement, front, PDF isolé ; l'exécution est bloquée par C-01, C-02, C-03 et par l'absence de Docker sur le poste | 31/10/2026 | | Objectifs de sauvegarde adaptés par DP-69 (6 heures, perte maximale de 24 heures) |
 | 02 | À faire | | | |
 | 03 | À faire | | | |
 | 04 | À faire | | | |
@@ -159,7 +159,7 @@ flowchart LR
 
 ## 5. Estimation
 
-**Estimation de planification, à recaler à la fin des étapes 00 et 01** (vitesse réelle avec Claude Code, durée des prototypes, coût de la CI). Hypothèses : 1 JD = 5 h ; effort nominal 176 JD pour J3, fourchette de 0,8 à 1,4 fois (141 à 246 JD) ; rendement d'équipe de 0,70 à 0,85 à deux (0,78 nominal : revues, dépendances, coordination) et de 0,85 à 0,95 seul ; aucune astreinte ; pas de congé ni de jour férié compté ; hors temps d'attente des contenus de la section 6.
+**Estimation de planification, à recaler à la fin des étapes 00 et 01** (vitesse réelle avec Claude Code, durée des prototypes, coût de la CI). Hypothèses : 1 JD = 5 h ; effort nominal 176 JD pour J3, fourchette de 0,8 à 1,4 fois (141 à 246 JD) ; rendement d'équipe de 0,70 à 0,85 à deux (0,78 nominal : revues, dépendances, coordination) et de 0,85 à 0,95 seul ; aucune astreinte ; pas de congé ni de jour férié compté ; hors temps d'attente des contenus de la section 6.
 
 **Vitesse constatée à la fin de l'étape 00 (31/10/2026)** : environ **un jour calendaire** de séance, Mimis à distance, pour 13 JD (65 h) estimés, cinq prototypes dont quatre exécutés ; plusieurs mesures de plus d'une heure tournaient en tâche de fond pendant la rédaction du code suivant. **Cette vitesse n'est pas extrapolable** : prototypes jetables sans interface, sans revue de code ni intégration continue, sans validation juridique, avec un poste déjà préparé la veille. La grille de dates n'est donc **pas** recalée ; le recalage se fait à la fin de l'étape 01 avec la première mesure d'un chantier protégé (DP-72).
 
