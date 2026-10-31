@@ -13,6 +13,9 @@ disallowed-types = [
 ]
 
 disallowed-methods = [
+    { path = "sqlx::query", reason = "requête non vérifiée : réservée à platform ; ailleurs, requêtes vérifiées par OrgTx (DP-77)" },
+    { path = "sqlx::query_as", reason = "requête non vérifiée : réservée à platform (DP-77)" },
+    { path = "sqlx::query_scalar", reason = "requête non vérifiée : réservée à platform (DP-77)" },
     { path = "chrono::Utc::now", reason = "lire l'heure par le service Clock (R-002, DP-50)" },
     { path = "chrono::Local::now", reason = "lire l'heure par le service Clock (R-002, DP-50)" },
     { path = "std::time::SystemTime::now", reason = "lire l'heure par le service Clock (R-002, DP-50)" },

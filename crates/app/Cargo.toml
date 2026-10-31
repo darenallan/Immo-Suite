@@ -1,9 +1,23 @@
 [package]
 name = "immo-app"
 version = "0.0.0"
+description = "Modules et plate-forme d'Immo Suite (horloge, configuration, fichiers, base avec contexte d'organisation)"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 license.workspace = true
+
 [lints]
 workspace = true
+
+[dependencies]
+immo-domain = { path = "../domain" }
+thiserror = { workspace = true }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10"
+tokio = { version = "1", features = ["fs", "io-util", "time", "rt"] }
+uuid = { version = "1", features = ["v4"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-native-tls", "postgres"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
