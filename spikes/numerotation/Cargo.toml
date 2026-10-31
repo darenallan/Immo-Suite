@@ -1,0 +1,17 @@
+[package]
+name = "spike-numerotation"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Prototype (c), hors du build du produit (CODING_RULES.md §1.1) : espace de travail propre.
+[workspace]
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "signal"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-native-tls", "postgres"] }
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
+uuid = { version = "1", features = ["v4"] }
