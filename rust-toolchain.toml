@@ -1,0 +1,5 @@
+# Version de Rust figée (DP-83). Une mise à jour est une PR dédiée (CODING_RULES.md §3.1).
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]

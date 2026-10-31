@@ -1,0 +1,12 @@
+[package]
+name = "immo-server"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+[lints]
+workspace = true
+[[bin]]
+name = "immo"
+path = "src/main.rs"

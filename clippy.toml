@@ -1,0 +1,19 @@
+# Accès à la base et à l'horloge réservés au module `platform` (CODING_RULES.md §3.1, décision n° 75).
+# Un `#[allow]` dans `platform` porte un commentaire qui cite la raison.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-print-in-tests = true
+allow-dbg-in-tests = true
+
+disallowed-types = [
+    { path = "sqlx::PgPool", reason = "toute requête passe par OrgTx (DP-77) ; PgPool réservé à platform" },
+    { path = "sqlx::Pool", reason = "toute requête passe par OrgTx (DP-77) ; Pool réservé à platform" },
+    { path = "sqlx::PgConnection", reason = "toute requête passe par OrgTx (DP-77) ; PgConnection réservé à platform" },
+]
+
+disallowed-methods = [
+    { path = "chrono::Utc::now", reason = "lire l'heure par le service Clock (R-002, DP-50)" },
+    { path = "chrono::Local::now", reason = "lire l'heure par le service Clock (R-002, DP-50)" },
+    { path = "std::time::SystemTime::now", reason = "lire l'heure par le service Clock (R-002, DP-50)" },
+]
