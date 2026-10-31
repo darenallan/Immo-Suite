@@ -302,6 +302,17 @@ async fn record_event(events_url: &Option<String>, action: &str, detail: serde_j
     }
 }
 
+/// Génère une paire de clés `age` : (clé publique `age1…`, clé privée `AGE-SECRET-KEY-1…`). La clé privée n'est jamais journalisée ;
+/// l'appelant l'écrit dans un fichier conservé hors ligne, en deux exemplaires (DP-82).
+pub fn generate_keypair() -> (String, String) {
+    use age::secrecy::ExposeSecret;
+    let identity = age::x25519::Identity::generate();
+    (
+        identity.to_public().to_string(),
+        identity.to_string().expose_secret().to_string(),
+    )
+}
+
 // ───────── sauvegarde ─────────
 
 /// Fait une copie, la chiffre, l'envoie et renvoie son manifeste. Journalise `backup.done` ou `backup.failed` (sans donnée personnelle).
@@ -556,13 +567,13 @@ pub fn check_alerts(now: DateTime<Utc>, manifests: &[Manifest]) -> Vec<Alert> {
         }),
         None => alerts.push(Alert::Missing { hours_since_last: None }),
     }
-    if let Some(previous) = manifests.len().checked_sub(2).and_then(|i| manifests.get(i)) {
-        if last.size_bytes.saturating_mul(2) < previous.size_bytes {
-            alerts.push(Alert::TooSmall {
-                previous_bytes: previous.size_bytes,
-                current_bytes: last.size_bytes,
-            });
-        }
+    if let Some(previous) = manifests.len().checked_sub(2).and_then(|i| manifests.get(i))
+        && last.size_bytes.saturating_mul(2) < previous.size_bytes
+    {
+        alerts.push(Alert::TooSmall {
+            previous_bytes: previous.size_bytes,
+            current_bytes: last.size_bytes,
+        });
     }
     alerts
 }
@@ -645,6 +656,14 @@ mod tests {
         let t = parse_pg_url("postgres://postgres@127.0.0.1/x").unwrap();
         assert_eq!((t.password, t.port.as_str()), (None, "5432"));
         assert!(parse_pg_url("mysql://x").is_err() && parse_pg_url("postgres://u@h").is_err());
+    }
+
+    #[test]
+    fn paire_de_cles_generee() {
+        let (public, secret) = generate_keypair();
+        assert!(public.starts_with("age1") && secret.starts_with("AGE-SECRET-KEY-1"));
+        assert!(public.parse::<age::x25519::Recipient>().is_ok() && secret.parse::<age::x25519::Identity>().is_ok());
+        assert_ne!(generate_keypair().1, secret, "deux paires générées sont différentes");
     }
 
     #[test]
