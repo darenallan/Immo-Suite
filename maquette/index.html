@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Immo Suite · maquette de démonstration</title>
+<!-- Maquette statique : aucune ressource externe, s'ouvre par double-clic (file://). -->
+<link rel="icon" type="image/svg+xml" href="assets/symbole-petit.svg">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/composants.css">
+<link rel="stylesheet" href="css/ecrans.css">
+<link rel="stylesheet" href="css/print-quittance.css">
+<link rel="stylesheet" href="css/demo.css">
+</head>
+<body>
+<a class="lien-evitement" href="#contenu">Aller au contenu</a>
+<div id="sprite" aria-hidden="true"></div>
+
+<div class="bandeau-maquette" role="note">
+  <strong>Maquette de démonstration</strong>
+  <span>données fictives · nom provisoire · 13/11/2026 09:15</span>
+</div>
+
+<div class="app">
+  <header class="topbar">
+    <a class="marque" href="#/" aria-label="Immo Suite, retour à l'accueil">
+      <img class="marque-logo" src="assets/symbole.svg" alt="" width="36" height="36">
+      <span class="marque-texte"><img class="marque-nom-img" src="assets/nom.svg" alt="" height="16"><span class="marque-org" id="marque-org"></span></span>
+    </a>
+    <form class="recherche" id="form-recherche" role="search">
+      <label class="sr-only" for="champ-recherche">Rechercher un locataire, un lot ou une quittance</label>
+      <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-search"/></svg>
+      <input id="champ-recherche" type="search" placeholder="Rechercher un locataire, un lot, une quittance ( / )" autocomplete="off">
+    </form>
+    <div class="topbar-actions">
+      <button type="button" class="btn-icone btn-recherche-mobile" data-action="recherche-mobile" aria-label="Rechercher"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-search"/></svg></button>
+      <button type="button" class="btn-icone" id="btn-notif" data-action="notif" aria-haspopup="dialog" aria-label="Notifications">
+        <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-bell"/></svg><span class="pastille-notif" id="notif-pastille"></span>
+      </button>
+      <button type="button" class="btn-role" data-action="role-menu" aria-haspopup="dialog" aria-label="Changer de rôle">
+        <span class="avatar" id="role-avatar" aria-hidden="true"></span>
+        <span class="btn-role-texte"><span class="btn-role-nom" id="role-nom"></span><span class="btn-role-fonction" id="role-fonction"></span></span>
+        <svg class="ic ic-sm" aria-hidden="true" focusable="false"><use href="#i-chevron-down"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="corps">
+    <nav class="sidebar" aria-label="Navigation principale"><div id="sidebar-liens"></div></nav>
+    <main class="principal" id="contenu" tabindex="-1"></main>
+  </div>
+
+  <nav class="bottombar" id="bottombar" aria-label="Navigation principale"></nav>
+</div>
+
+<div id="calques"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- Données fictives (scripts classiques qui remplissent window.DEMO) -->
+<script charset="utf-8" src="data/agence.js"></script>
+<script charset="utf-8" src="data/biens.js"></script>
+<script charset="utf-8" src="data/lots.js"></script>
+<script charset="utf-8" src="data/proprietaires.js"></script>
+<script charset="utf-8" src="data/locataires.js"></script>
+<script charset="utf-8" src="data/baux.js"></script>
+<script charset="utf-8" src="data/echeances.js"></script>
+<script charset="utf-8" src="data/paiements.js"></script>
+<script charset="utf-8" src="data/relances.js"></script>
+<script charset="utf-8" src="data/travaux.js"></script>
+<script charset="utf-8" src="data/documents.js"></script>
+<script charset="utf-8" src="data/releves.js"></script>
+<script charset="utf-8" src="data/import.js"></script>
+<!-- Noyau -->
+<script charset="utf-8" src="js/icones.js"></script>
+<script charset="utf-8" src="js/format.js"></script>
+<script charset="utf-8" src="js/etat.js"></script>
+<script charset="utf-8" src="js/roles.js"></script>
+<script charset="utf-8" src="js/donnees.js"></script>
+<script charset="utf-8" src="js/composants.js"></script>
+<script charset="utf-8" src="js/mutations.js"></script>
+<script charset="utf-8" src="js/app.js"></script>
+<!-- Écrans -->
+<script charset="utf-8" src="js/ecrans/introuvable.js"></script>
+<script charset="utf-8" src="js/ecrans/accueil.js"></script>
+<script charset="utf-8" src="js/ecrans/encaisser.js"></script>
+<script charset="utf-8" src="js/ecrans/quittance.js"></script>
+<script charset="utf-8" src="js/ecrans/paiements.js"></script>
+<script charset="utf-8" src="js/ecrans/impayes.js"></script>
+<script charset="utf-8" src="js/ecrans/comptes-rendus.js"></script>
+<script charset="utf-8" src="js/ecrans/import.js"></script>
+<script charset="utf-8" src="js/ecrans/travaux.js"></script>
+<script charset="utf-8" src="js/ecrans/lots.js"></script>
+<script charset="utf-8" src="js/ecrans/locataires.js"></script>
+<script charset="utf-8" src="js/ecrans/baux.js"></script>
+<script charset="utf-8" src="js/ecrans/mandants.js"></script>
+<script charset="utf-8" src="js/ecrans/agenda.js"></script>
+<script charset="utf-8" src="js/ecrans/utilisateurs.js"></script>
+<script charset="utf-8" src="js/ecrans/parametres.js"></script>
+<script charset="utf-8" src="js/ecrans/connexion.js"></script>
+
+<!-- Démonstration guidée et mode tournage (un fichier par parcours, puis le film qui les réutilise) -->
+<script charset="utf-8" src="js/demo-guidee.js"></script>
+<script charset="utf-8" src="js/demos/parcours1.js"></script>
+<script charset="utf-8" src="js/demos/parcours2.js"></script>
+<script charset="utf-8" src="js/demos/parcours3.js"></script>
+<script charset="utf-8" src="js/demos/parcours4.js"></script>
+<script charset="utf-8" src="js/demos/parcours5.js"></script>
+<script charset="utf-8" src="js/demos/film.js"></script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+/*
+ * Immo Suite : design tokens.
+ * Copie conforme du bloc « Design tokens » de UI_UX_DESIGN.md.
+ * Fichier autonome, réutilisable tel quel dans le vrai produit.
+ * Palette bleu nuit / blanc / turquoise (décision n° 16). Vouvoiement PROVISOIRE (décision ouverte n° 17).
+ */
+:root {
+  /* Marque : bleu nuit, blanc, turquoise (décision n° 16, palette retenue le 25/10/2026) */
+  --color-brand-600: #142B4A;      /* primaire : boutons, fond du menu latéral, soulignements (bleu nuit) */
+  --color-brand-700: #0D1E36;      /* survol, appui, texte sur fond teinté */
+  --color-brand-100: #DCE6F3;      /* fond teinté */
+  --color-brand-050: #EAF0F8;
+  --color-accent-500: #159D91;     /* accent turquoise : remplissage ou bordure UNIQUEMENT, jamais en texte (3,3:1 sur blanc) */
+  --color-accent-300: #5FD3C6;     /* turquoise clair : accent sur fond bleu nuit (menu latéral, anneau de focus) */
+  --color-accent-100: #DDF3F0;
+
+  /* Neutres froids */
+  --color-bg: #F3F6FA;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: #E9EEF5;
+  --color-border: #D5DDE8;          /* séparateurs décoratifs */
+  --color-border-input: #6F7F97;    /* contours de champs et de contrôles (≥ 3:1) */
+  --color-text: #263449;
+  --color-text-secondary: #44546C;
+  --color-text-muted: #5A6B84;
+  --color-text-on-brand: #FFFFFF;
+  --color-text-on-accent: #0A1626;
+  --color-link: #0E6F66;            /* turquoise foncé : liens sur fond clair (6,0:1 sur blanc) */
+  --color-focus: #142B4A;
+  --color-overlay: rgba(20, 43, 74, 0.55);
+
+  /* Menu latéral sur fond bleu nuit (textes ≥ 7:1 sur --color-brand-600) */
+  --nav-text: #DCE6F3;
+  --nav-text-muted: #B8C7DC;
+  --nav-active-bg: #1E3A63;
+
+  /* Statuts financiers (fond / texte). Toujours avec icône + libellé */
+  --status-paid-bg: #E3F2E8;     --status-paid-fg: #1F5E3A;
+  --status-partial-bg: #FCE8D8;  --status-partial-fg: #8A3A00;
+  --status-late-bg: #FBE4E1;     --status-late-fg: #9B1C1C;
+  --status-upcoming-bg: #E4ECF4; --status-upcoming-fg: #2F4B66;
+  --status-due-bg: #FDF1D5;      --status-due-fg: #6B4600;
+  --status-credit-bg: #ECE8F8;   --status-credit-fg: #4B3A8C;
+  --status-void-bg: #E8ECF1;     --status-void-fg: #4A5568;
+  --status-due-mark: #B7791F;    /* repère graphique « due » (barres), jamais en texte */
+
+  /* Badges neutres : lot, bail, quittance, usage (aucune couleur de statut financier) */
+  --neutral-badge-bg: var(--color-surface-sunken);
+  --neutral-badge-fg: var(--color-text-secondary);
+
+  /* Retours (réutilisent les paires de statuts) */
+  --feedback-success-bg: var(--status-paid-bg);     --feedback-success-fg: var(--status-paid-fg);
+  --feedback-warning-bg: var(--status-due-bg);      --feedback-warning-fg: var(--status-due-fg);
+  --feedback-error-bg: var(--status-late-bg);       --feedback-error-fg: var(--status-late-fg);
+  --feedback-info-bg: var(--status-upcoming-bg);    --feedback-info-fg: var(--status-upcoming-fg);
+
+  /* Typographie : polices système, aucun téléchargement */
+  --font-sans: "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-numeric: tabular-nums;
+  --text-sm: 0.875rem;    /* 14 px : minimum pour tout texte utile */
+  --text-base: 1rem;      /* 16 px : corps et champs (évite le zoom iOS) */
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;   /* chiffres clés */
+  --leading-body: 1.5;
+  --leading-title: 1.25;
+  --weight-regular: 400;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Espacements (base 4 px) */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px;
+
+  /* Rayons */
+  --radius-sm: 6px;  --radius-md: 10px;  --radius-lg: 16px;  --radius-pill: 999px;
+
+  /* Ombres (légères : écrans bon marché, plein soleil) */
+  --shadow-1: 0 1px 2px rgba(20, 43, 74, 0.08);
+  --shadow-2: 0 4px 12px rgba(20, 43, 74, 0.12);
+  --shadow-3: 0 12px 32px rgba(20, 43, 74, 0.20);
+
+  /* Mise en page */
+  --target-min: 44px;       /* cible tactile minimale */
+  --target-primary: 52px;   /* bouton primaire sur mobile */
+  --topbar-height: 56px;
+  --bottombar-height: 64px;
+  --sidebar-width: 248px;
+  --content-max: 1200px;
+  --gutter-mobile: 16px;
+  --gutter-desktop: 24px;
+
+  /* Mouvement */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+
+  /* Couches */
+  --z-sticky: 10; --z-nav: 20; --z-sheet: 30; --z-modal: 40; --z-toast: 50;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-fast: 0ms; --motion-base: 0ms; }
+}
