@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | **Proposition du 31/10/2026, en attente de validation de Mimis** (procédure `ROADMAP.md` §8, point 2) |
+| Statut | **Validée par Mimis le 31/10/2026 (DP-82), sauf le choix du second fournisseur**, reporté ; Docker et outillage : DP-83 (délégation) |
 | Étape | 01, `roadmap/etape-01-socle-ci-environnements-sauvegardes.md` §4 |
 | Dépend de | DP-55, DP-69, DP-70, DP-71, DP-78 ; décisions n° 24, 53, 95 ; contenus C-01 et C-02 |
 | Critères visés | PP-13, PP-14, PP-15, PP-33 (`TESTING_QA.md` §12) |
@@ -17,8 +17,8 @@ Garantir qu'une perte (erreur humaine, panne, perte de l'hébergeur de la base, 
 | N° | Règle | Origine |
 |---|---|---|
 | F39-R1 | **Trois couches.** (1) Historique du service de base : au plan gratuit, **6 heures** de restauration à un instant donné. (2) **Copie logique quotidienne** : `pg_dump -Fc` avec le rôle `immo_backup`, **chiffrée avant envoi**, envoyée chez un **second fournisseur**. (3) **Réplication quotidienne du seau de fichiers** vers le même second fournisseur. | `DEPLOYMENT.md` §5.1 ; DP-69 |
-| F39-R2 | **Objectifs au pilote** (remplacent ceux de la fiche d'étape, DP-69) : récupération d'une erreur récente par restauration à un instant donné dans les **6 dernières heures** ; **perte maximale de 24 heures** si la base est perdue (une copie par jour) ; **reprise sous 4 heures** en journée ouvrée ; **30 copies quotidiennes et 12 copies mensuelles** conservées ; **test de restauration chaque mois**, à partir d'une copie logique. Les objectifs de 15 minutes et de 30 jours sont **suspendus** jusqu'aux premiers abonnés payants. | DP-69 ; décision n° 24 [À confirmer] |
-| F39-R3 | **Chiffrement à clé publique** (proposition, décision n° 95) : le serveur et le travail de sauvegarde ne portent que la **clé publique** ; la **clé privée** est hors ligne, en **deux exemplaires** (le développeur et le porteur du projet), et ne sert qu'à restaurer. Outil proposé : un outil de chiffrement moderne à destinataire public, à binaire unique (par exemple `age`) [À valider]. Un attaquant qui prend le serveur ne peut pas relire les copies. | `DEPLOYMENT.md` §5.2 ; `SECURITY.md` §5.3 |
+| F39-R2 | **Objectifs au pilote** (remplacent ceux de la fiche d'étape, DP-69) : récupération d'une erreur récente par restauration à un instant donné dans les **6 dernières heures** ; **perte maximale de 24 heures** si la base est perdue (une copie par jour) ; **reprise sous 4 heures** en journée ouvrée ; **30 copies quotidiennes et 12 copies mensuelles** conservées ; **test de restauration chaque mois**, à partir d'une copie logique. Les objectifs de 15 minutes et de 30 jours sont **suspendus** jusqu'aux premiers abonnés payants. | DP-69, DP-82 (acceptés par Mimis) |
+| F39-R3 | **Chiffrement à clé publique** (décision n° 95, DP-82) : le serveur et le travail de sauvegarde ne portent que la **clé publique** ; la **clé privée** est hors ligne, en **deux exemplaires** (le développeur et le porteur du projet), et ne sert qu'à restaurer. Outil retenu : `age` (DP-82). Clé privée en deux exemplaires, détenus par Mimis et le développeur. Un attaquant qui prend le serveur ne peut pas relire les copies. | `DEPLOYMENT.md` §5.2 ; `SECURITY.md` §5.3 |
 | F39-R4 | **La clé de chiffrement des champs sensibles** (`*_enc`) est sauvegardée **à part**, en deux exemplaires : sans elle, une restauration rend ces champs illisibles. | `DEPLOYMENT.md` §5.2 |
 | F39-R5 | **Droits d'envoi en écriture seule** : les identifiants du travail ne lisent, ne suppriment et n'écrasent rien ; **verrouillage d'objet** ou versionnage chez le second fournisseur. Si le fournisseur n'en offre pas : copie hors ligne mensuelle et écart noté. | `SECURITY.md` §5.3 ; décision n° 53 |
 | F39-R6 | **Manifeste** de chaque copie : nom, taille, SHA-256, version du schéma, date, nombre de lignes par table. Vérifié à la restauration et chaque nuit. | `DEPLOYMENT.md` §5.2 et §5.5 |
@@ -94,10 +94,10 @@ L'étape 01 ne peut pas être menée à son terme tant que ces éléments, qui n
 5. **Docker est absent du poste** (CLAUDE.md, « Poste réel »). L'étape 01 prévoit un Dockerfile, Compose et un développement local sous Docker. Sans droits d'administrateur à distance, l'installation de Docker Desktop (WSL ou Hyper-V) n'est pas possible. **Proposition** : construire et tester l'image **dans la CI** (Linux), développer en local avec le PostgreSQL du port 5433 déjà utilisé par les prototypes, et installer Docker plus tard si Mimis le souhaite [À valider].
 6. **Prototype (e)** : la mesure réseau à Ouagadougou, reportée par DP-75, est une tâche de l'étape 01 (5.7, point 9) ; Mimis la fera plus tard.
 
-## 8. Questions pour Mimis
+## 8. Réponses de Mimis (31/10/2026)
 
-1. Les objectifs adaptés par DP-69 (6 heures d'historique, perte maximale de 24 heures, 30 copies quotidiennes, 12 mensuelles) sont-ils acceptables pour le pilote ?
-2. Chiffrement à clé publique (proposition) ou clé symétrique ?
-3. Qui détient les deux exemplaires de la clé privée, et où sont-ils gardés ?
-4. Quel second fournisseur, et offre-t-il l'écriture seule et le verrouillage d'objet ?
-5. Docker : construire l'image dans la CI seulement (proposition) ?
+1. Objectifs adaptés par DP-69 : **acceptables** pour le pilote (DP-82).
+2. Chiffrement : **à clé publique** (DP-82).
+3. Clé privée : **deux exemplaires détenus par Mimis et le développeur** (DP-82).
+4. Second fournisseur : **reporté** ; PP-13 reste à atteindre.
+5. Docker : image construite **dans la CI seulement**, par délégation (DP-83).
