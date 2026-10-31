@@ -1,0 +1,17 @@
+[package]
+name = "immo-db-tests"
+version = "0.0.0"
+description = "Tests de base de données : schéma, rôles, isolation, pool sous concurrence (TESTING_QA.md §3)"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+immo-app = { path = "../../crates/app" }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-native-tls", "postgres", "migrate"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "sync", "time"] }
+uuid = { version = "1", features = ["v4"] }

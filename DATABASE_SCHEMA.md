@@ -2301,12 +2301,14 @@ CONSTRAINT leases_no_overlap EXCLUDE USING gist (
 ```sql
 -- Garde commune à toutes les tables d'écriture
 CREATE FUNCTION forbid_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE v_op text := current_setting('app.owner_op', true);
+DECLARE v_op text := current_setting('app.owner_op', true); v_lifecycle text;
 BEGIN
   IF TG_OP = 'DELETE' AND current_user = 'immo_owner' THEN
     IF v_op = 'import_cancel' THEN RETURN OLD;
-    ELSIF v_op = 'org_purge'
-      AND (SELECT lifecycle FROM organizations WHERE id = OLD.org_id) = 'setup' THEN RETURN OLD;
+    ELSIF v_op = 'org_purge' THEN
+      -- version de l'étape 01 : SQL dynamique, la table organizations peut ne pas exister encore et OLD.org_id n'existe pas partout
+      EXECUTE 'SELECT lifecycle FROM organizations WHERE id = $1' INTO v_lifecycle USING (to_jsonb(OLD) ->> 'org_id')::uuid;
+      IF v_lifecycle = 'setup' THEN RETURN OLD; END IF;
     END IF;
   END IF;
   RAISE EXCEPTION 'table % en ecriture seule : % refuse', TG_TABLE_NAME, TG_OP USING ERRCODE = 'restrict_violation';
