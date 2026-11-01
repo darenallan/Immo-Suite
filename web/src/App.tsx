@@ -1,23 +1,57 @@
+import { AuthProvider, useAuth } from './auth';
 import { fr } from './texts/fr';
-import { appEnvironment, appVersion } from './version';
+import { ChooseOrganization } from './screens/ChooseOrganization';
+import { Login } from './screens/Login';
+import { ComingSoon, Denied, Home, NotFound } from './screens/Simple';
+import { usePath } from './router';
+import { NAV_ENTRIES, isRole, isVisible } from './shell/nav';
+import { Shell } from './shell/Shell';
+
+function Screens() {
+  const { state } = useAuth();
+  const [path, navigate] = usePath();
+
+  if (state.status === 'loading') {
+    return (
+      <main className="login">
+        <p role="status" className="muted">
+          {fr.common.loading}
+        </p>
+      </main>
+    );
+  }
+  if (state.status === 'anonymous') return <Login notice={state.notice} />;
+
+  const me = state.me;
+  if (me.organization === null || me.organization === undefined) return <ChooseOrganization me={me} />;
+
+  const role = me.membership?.role ?? '';
+  const home = () => {
+    navigate('/');
+  };
+  let content;
+  const entry = NAV_ENTRIES.find((e) => e.path === path);
+  if (entry === undefined) {
+    content = <NotFound onHome={home} />;
+  } else if (!isRole(role) || !isVisible(entry, role, me.permissions)) {
+    // adresse tapée à la main pour une entrée que le rôle n'a pas : « Accès refusé » (le serveur refuse de toute façon)
+    content = <Denied onHome={home} />;
+  } else if (entry.id === 'home') {
+    content = <Home me={me} />;
+  } else {
+    content = <ComingSoon title={fr.nav.entries[entry.id]} />;
+  }
+  return (
+    <Shell me={me} path={path} navigate={navigate}>
+      {content}
+    </Shell>
+  );
+}
 
 export function App() {
   return (
-    <main className="page">
-      <header className="page__header">
-        <h1>{fr.app.name}</h1>
-        <p className="muted">{fr.app.tagline}</p>
-      </header>
-      <section aria-labelledby="home-title" className="card">
-        <h2 id="home-title">{fr.home.title}</h2>
-        <p>{fr.home.intro}</p>
-        <dl className="facts">
-          <dt>{fr.home.versionLabel}</dt>
-          <dd data-testid="version">{appVersion}</dd>
-          <dt>{fr.home.environmentLabel}</dt>
-          <dd data-testid="environment">{appEnvironment}</dd>
-        </dl>
-      </section>
-    </main>
+    <AuthProvider>
+      <Screens />
+    </AuthProvider>
   );
 }
