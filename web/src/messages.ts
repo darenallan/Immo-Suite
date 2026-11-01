@@ -12,6 +12,16 @@ export function messageFor(problem: ApiProblem): string {
   if (problem.code === 'auth.rate_limited') {
     return fr.rateLimited(formatDuration(problem.retryAfterSeconds ?? 60));
   }
+  if (problem.code === 'rate_limit.exceeded') {
+    return fr.requestRateLimited(formatDuration(problem.retryAfterSeconds ?? 60));
+  }
+  if (problem.code === 'auth.password_weak' && problem.reason !== undefined) {
+    const reason = fr.passwordWeak[problem.reason];
+    if (reason !== undefined) return reason;
+  }
+  if (problem.code === 'validation.failed' && problem.fields.length > 0) {
+    return problem.fields.map((f) => fr.fieldErrors[f.code] ?? fr.errors['validation.failed']).join(' ');
+  }
   const known = (fr.errors as Record<string, string | undefined>)[problem.code];
   if (known !== undefined) return known;
   return problem.requestId !== undefined

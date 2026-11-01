@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Journal d'audit, du plus récent au plus ancien. Filtres facultatifs, pagination par curseur (25 par défaut, 100 au plus). */
+        get: operations["list_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -58,6 +75,206 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/password-reset/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Choisit un nouveau mot de passe avec un lien de réinitialisation. Aucune session n'est ouverte. */
+        post: operations["password_reset_complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/reauth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirme le mot de passe : valable 5 minutes pour les actions à enjeu de cette session. */
+        post: operations["reauth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/totp/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Second facteur : le défi de la connexion et le code ouvrent la session. */
+        post: operations["totp_verify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/client-errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Erreur du front (`window.onerror`, rejet non traité). Nettoyée (numéros, adresses, jetons), agrégée par empreinte ; ni pile ni
+         *     adresse ; `204`.
+         */
+        post: operations["post_client_error"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Événements d'usage du front, par lots (20 et 8 Kio au plus). Liste blanche fermée : un événement inconnu, d'origine serveur ou
+         *     aux propriétés hors liste est écarté **et compté** ; la réponse reste `204` en production, `422` en développement et en essai.
+         */
+        post: operations["post_events"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Signalement d'un problème. Crée la ligne, l'événement `feedback_submitted` et la tâche d'alerte dans la même transaction.
+         *     `Idempotency-Key` (UUID) : un double clic ne crée qu'un signalement.
+         */
+        post: operations["post_feedback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Invitations de l'organisation (en attente, expirées, acceptées, révoquées). */
+        get: operations["list_invitations"];
+        put?: never;
+        /** Crée une invitation. Le lien n'est dans aucune autre réponse : pour le retrouver, « Renvoyer ». */
+        post: operations["create_invitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accepte une invitation. Nouveau compte : nom et mot de passe, la session est ouverte. Compte existant : connexion préalable
+         *     (la session de ce compte porte la requête), l'adhésion est créée et la session garde son organisation active.
+         */
+        post: operations["accept_invitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invitations/{id}/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Renvoie une invitation : l'ancienne est révoquée, un nouveau jeton est créé. */
+        post: operations["renew_invitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invitations/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Révoque une invitation : le lien cesse de fonctionner. */
+        post: operations["revoke_invitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/invitations/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page publique d'invitation : organisation, rôle, échéance. Expirée, révoquée ou utilisée : 410, même corps. */
+        get: operations["invitation_preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me": {
         parameters: {
             query?: never;
@@ -72,7 +289,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Nom affiché et, avec confirmation du mot de passe, numéro de téléphone. */
+        patch: operations["update_me"];
         trace?: never;
     };
     "/api/me/organization": {
@@ -95,6 +313,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change le mot de passe : les autres sessions sont révoquées, la session courante reçoit un nouvel identifiant. */
+        put: operations["change_password"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Crée le secret de la double authentification (affiché une seule fois). */
+        post: operations["totp_begin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Active la double authentification et remet les codes de secours. */
+        post: operations["totp_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/organization": {
         parameters: {
             query?: never;
@@ -105,6 +374,180 @@ export interface paths {
         /** Fiche de l'organisation active (droit `settings.read` ; lecture partielle pour les rôles sans droit d'écriture). */
         get: operations["organization"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Nom et ville de l'organisation (`If-Match` obligatoire). */
+        patch: operations["patch_organization"];
+        trace?: never;
+    };
+    "/api/role-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Les droits réglables applicables au plan de l'organisation. */
+        get: operations["get_role_settings"];
+        /** Règle un droit (`If-Match` : la version lue, 0 pour créer). Effet à la requête suivante, sans reconnexion. */
+        put: operations["put_role_setting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Paramètres de l'organisation (fuseau, devise et langue en lecture seule). */
+        get: operations["get_settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Modifie les paramètres (`If-Match`). Un champ inconnu est refusé ; un montant décimal ou négatif aussi. */
+        patch: operations["patch_settings"];
+        trace?: never;
+    };
+    "/api/support-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accords donnés à l'équipe HABEK et consultations qu'elle a faites. */
+        get: operations["list_support_grants"];
+        put?: never;
+        /** Autorise l'équipe HABEK pour une durée limitée (confirmation du mot de passe exigée). */
+        post: operations["create_support_grant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/support-grants/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire l'accès immédiatement (confirmation du mot de passe exigée). */
+        post: operations["revoke_support_grant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Membres de l'organisation active. */
+        get: operations["list_users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{membership_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change le rôle d'un membre : effet à la requête suivante, aucune session révoquée. */
+        patch: operations["change_role"];
+        trace?: never;
+    };
+    "/api/users/{membership_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Désactive un membre : ses sessions sur cette organisation sont révoquées. */
+        post: operations["disable_user"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{membership_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Réactive un membre (confirmation du mot de passe exigée). */
+        post: operations["enable_user"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{membership_id}/password-resets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Génère un lien de réinitialisation de 15 minutes pour un membre (jamais pour un gérant : support HABEK). */
+        post: operations["issue_reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/{membership_id}/unit-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Affecte des lots à un membre. Jusqu'à l'étape 05, seule la liste vide est acceptée (retrait des affectations). */
+        put: operations["set_unit_assignments"];
         post?: never;
         delete?: never;
         options?: never;
@@ -150,14 +593,149 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptInvitationPayload: {
+            /** @description Nouveau compte seulement. */
+            display_name?: string | null;
+            /** @description Nouveau compte seulement. */
+            password?: string | null;
+            token: string;
+        };
+        AuditActorBody: {
+            kind: string;
+            label?: string | null;
+            name?: string | null;
+            user_id?: string | null;
+        };
+        AuditActorChoice: {
+            id: string;
+            name: string;
+        };
+        AuditMetaBody: {
+            /** @description Personnes qui ont une adhésion dans l'organisation (filtre « utilisateur »). */
+            actors: components["schemas"]["AuditActorChoice"][];
+        };
+        AuditObjectBody: {
+            id: string;
+            type: string;
+        };
+        AuditPageBody: {
+            items: components["schemas"]["AuditRowBody"][];
+            meta: components["schemas"]["AuditMetaBody"];
+            next_cursor?: string | null;
+        };
+        AuditRowBody: {
+            action: string;
+            actor: components["schemas"]["AuditActorBody"];
+            after: Record<string, never>;
+            before: Record<string, never>;
+            /** Format: int64 */
+            id: number;
+            /** @description Absente (jamais vide) pour les rôles qui ne voient pas l'adresse IP. */
+            ip?: string | null;
+            object: components["schemas"]["AuditObjectBody"];
+            occurred_at: string;
+            request_id?: string | null;
+        };
+        BackupCodesBody: {
+            /** @description Dix codes de secours, affichés une seule fois, par groupes de 4 (`ABCD-EFGH-JKMN`). */
+            backup_codes: string[];
+        };
+        ChangePasswordPayload: {
+            current_password: string;
+            new_password: string;
+        };
+        ChangeRolePayload: {
+            role: string;
+        };
+        ClientErrorPayload: {
+            client_version: string;
+            /** @description Message de l'erreur JavaScript (200 caractères au plus après nettoyage ; jamais le texte de l'écran). */
+            message: string;
+            /** @description Jusqu'à 5 identifiants de requête (`INC-…`). */
+            request_ids: string[];
+            /** @description Écran (`S00` à `S26`). */
+            screen: string;
+        };
+        CreateInvitationPayload: {
+            email?: string | null;
+            /** @description Téléphone (un des deux, pas les deux). */
+            phone?: string | null;
+            role: string;
+            unit_ids?: string[];
+        };
+        CreateSupportGrantPayload: {
+            /**
+             * Format: int64
+             * @description De 1 à 168 (7 jours) ; 24 par défaut.
+             */
+            duration_hours?: number | null;
+            reason: string;
+            /** @description `read` ou `import_assist`. */
+            scope: string;
+        };
+        CreatedInvitationBody: {
+            expires_at: string;
+            invitation: components["schemas"]["InvitationBody"];
+            /** @description Lien à usage unique de 7 jours, affiché une seule fois. */
+            url: string;
+        };
+        EventsPayload: {
+            /** @description Jusqu'à 20 événements `{ name, properties, client_version }` ; les suivants sont écartés et comptés. */
+            events: Record<string, never>[];
+        };
+        FeedbackContextPayload: {
+            client_version: string;
+            last_error_code?: string | null;
+            last_request_ids: string[];
+            /** @description Modèle d'adresse : sans paramètre de requête ni jeton (nettoyé aussi par le serveur). */
+            path: string;
+            screen: string;
+            /** @description Taille d'écran `390x844`. */
+            viewport: string;
+        };
+        FeedbackCreatedBody: {
+            id: string;
+            /** @description Référence lisible `SIG-000042`, donnée au support. */
+            reference: string;
+        };
+        FeedbackPayload: {
+            can_call_back: boolean;
+            /** @description `bug`, `request` ou `question`. */
+            category: string;
+            context: components["schemas"]["FeedbackContextPayload"];
+            /** @description Texte libre de 5 à 4 000 caractères : stocké tel quel, jamais journalisé. */
+            description: string;
+        };
+        InvitationBody: {
+            created_at: string;
+            expires_at: string;
+            id: string;
+            identifier: string;
+            invited_by: string;
+            role: string;
+            /** @description `pending`, `expired`, `accepted` ou `revoked`. */
+            status: string;
+        };
+        InvitationPreviewBody: {
+            expires_at: string;
+            identifier_exists: boolean;
+            organization_name: string;
+            role: string;
+        };
+        InvitationsBody: {
+            invitations: components["schemas"]["InvitationBody"][];
+        };
         LoginBody: {
             /** @description Absente tant que l'utilisateur de plusieurs organisations n'en a pas choisi une. */
             active_organization_id?: string | null;
-            csrf_token: string;
-            /** @description Toujours faux à l'étape 02 (double authentification : étape 03). */
+            /** @description Défi signé valable 5 minutes (F01 §9.5), présent seulement si `mfa_required`. */
+            challenge?: string | null;
+            /** @description Absent quand un second facteur est exigé. */
+            csrf_token?: string | null;
+            /** @description Vrai si le compte a une double authentification : le défi se présente à `POST /auth/totp/verify` avec le code. */
             mfa_required: boolean;
             organizations: components["schemas"]["OrganizationChoiceBody"][];
-            user: components["schemas"]["UserBody"];
+            user?: null | components["schemas"]["UserBody"];
         };
         LoginPayload: {
             /** @description Téléphone (`+226` et 8 chiffres, formes usuelles acceptées) ou e-mail. */
@@ -178,6 +756,19 @@ export interface components {
             /** @description Date du jour au fuseau de l'organisation (AAAA-MM-JJ). */
             today: string;
             user: components["schemas"]["UserBody"];
+        };
+        MemberBody: {
+            display_name: string;
+            identifier: string;
+            is_self: boolean;
+            membership_id: string;
+            role: string;
+            /** @description `active` ou `disabled`. */
+            status: string;
+            user_id: string;
+        };
+        MembersBody: {
+            users: components["schemas"]["MemberBody"][];
         };
         MembershipBody: {
             role: string;
@@ -205,14 +796,139 @@ export interface components {
             lifecycle: string;
             name: string;
             plan: string;
+            /**
+             * Format: int32
+             * @description Version pour `If-Match` (`PATCH /organization`).
+             */
+            version: number;
+        };
+        PatchOrganizationPayload: {
+            /** @description Vide : efface la ville. */
+            city?: string | null;
+            name?: string | null;
+        };
+        PatchSettingsPayload: {
+            address?: string | null;
+            default_paper?: string | null;
+            legal_ids: Record<string, never>;
+            /**
+             * Format: int64
+             * @description Entier FCFA de 1 à 999 999 999 ; un décimal ou un négatif est refusé.
+             */
+            payment_confirm_threshold: number;
+            receipt_header?: string | null;
+            receipt_prefix?: string | null;
+            /** Format: int64 */
+            share_link_ttl_days: number;
+        };
+        ReauthPayload: {
+            password: string;
+        };
+        ResetCompletePayload: {
+            new_password: string;
+            token: string;
+        };
+        ResetLinkBody: {
+            expires_at: string;
+            /** @description Lien à usage unique de 15 minutes, affiché une seule fois. */
+            url: string;
+        };
+        RoleSettingBody: {
+            /** @description `record_payment`, `import_data` ou `export_data`. */
+            action: string;
+            allowed: boolean;
+            role: string;
+            /**
+             * Format: int32
+             * @description Valeur d'`If-Match` pour la prochaine écriture (0 : aucune ligne).
+             */
+            version: number;
+        };
+        RoleSettingPayload: {
+            action: string;
+            allowed: boolean;
+            role: string;
+        };
+        RoleSettingsBody: {
+            settings: components["schemas"]["RoleSettingBody"][];
         };
         SelectOrganizationPayload: {
             organization_id: string;
+        };
+        SettingsBody: {
+            address?: string | null;
+            currency: string;
+            default_paper: string;
+            legal_ids: Record<string, never>;
+            locale: string;
+            /**
+             * Format: int64
+             * @description Entier FCFA.
+             */
+            payment_confirm_threshold: number;
+            receipt_header?: string | null;
+            receipt_prefix: string;
+            /** Format: int32 */
+            share_link_ttl_days: number;
+            timezone: string;
+            /** Format: int32 */
+            version: number;
         };
         /** @description Réponse de `/health`. */
         StatusBody: {
             /** @description Toujours `ok` ; aucune donnée. */
             status: string;
+        };
+        SupportAccessBody: {
+            action: string;
+            actor_label: string;
+            object_id: string;
+            object_type: string;
+            occurred_at: string;
+        };
+        SupportGrantBody: {
+            /** Format: int64 */
+            duration_hours: number;
+            expires_at: string;
+            granted_at: string;
+            granted_by: string;
+            id: string;
+            reason: string;
+            revoked_at?: string | null;
+            /** @description `read` ou `import_assist`. */
+            scope: string;
+            /** @description `active`, `expired` ou `revoked` (dérivé). */
+            status: string;
+        };
+        SupportOverviewBody: {
+            accesses: components["schemas"]["SupportAccessBody"][];
+            grants: components["schemas"]["SupportGrantBody"][];
+        };
+        TotpConfirmPayload: {
+            code: string;
+        };
+        TotpEnrollmentBody: {
+            otpauth_url: string;
+            /** @description Clé en base32, affichée une seule fois. */
+            secret_base32: string;
+        };
+        TotpVerifyPayload: {
+            /** @description Défi reçu de `POST /auth/login`. */
+            challenge: string;
+            /** @description Code à 6 chiffres, ou code de secours (12 caractères, tirets facultatifs). */
+            code: string;
+        };
+        UnitAssignmentsBody: {
+            unit_ids: string[];
+        };
+        UnitAssignmentsPayload: {
+            /** @description Vide jusqu'à l'étape 05 (les lots n'existent pas encore). */
+            unit_ids: string[];
+        };
+        UpdateMePayload: {
+            display_name?: string | null;
+            /** @description Changer le numéro exige la confirmation du mot de passe. */
+            login_phone?: string | null;
         };
         UserBody: {
             display_name: string;
@@ -227,6 +943,66 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_audit: {
+        parameters: {
+            query?: {
+                /** @description Identifiant d'utilisateur */
+                actor_id?: string;
+                /** @description Code objet.verbe */
+                action?: string;
+                /** @description Type d'objet */
+                object_type?: string;
+                /** @description Identifiant d'objet */
+                object_id?: string;
+                /** @description AAAA-MM-JJ, fuseau de l'organisation, borne incluse */
+                from?: string;
+                /** @description AAAA-MM-JJ, fuseau de l'organisation, borne incluse */
+                to?: string;
+                /** @description user, system ou support */
+                actor_kind?: string;
+                /** @description 25 par défaut, 100 au plus */
+                limit?: number;
+                /** @description Curseur opaque de la page suivante */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page du journal */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPageBody"];
+                };
+            };
+            /** @description request.cursor_invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation.failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -329,6 +1105,447 @@ export interface operations {
             };
         };
     };
+    password_reset_complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetCompletePayload"];
+            };
+        };
+        responses: {
+            /** @description Mot de passe changé */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.reset_expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.password_weak */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description rate_limit.exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reauth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReauthPayload"];
+            };
+        };
+        responses: {
+            /** @description Confirmé pour 5 minutes */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.invalid_credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.rate_limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    totp_verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpVerifyPayload"];
+            };
+        };
+        responses: {
+            /** @description Connecté */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginBody"];
+                };
+            };
+            /** @description auth.totp_invalid ou auth.session_expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.rate_limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_client_error: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClientErrorPayload"];
+            };
+        };
+        responses: {
+            /** @description Erreur reçue */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description request.too_large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description rate_limit.exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventsPayload"];
+            };
+        };
+        responses: {
+            /** @description Lot reçu (certains événements ont pu être écartés et comptés) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description request.too_large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation.failed : hors production, un événement a été écarté */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description rate_limit.exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_feedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackPayload"];
+            };
+        };
+        responses: {
+            /** @description Signalement créé */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackCreatedBody"];
+                };
+            };
+            /** @description validation.failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description rate_limit.exceeded : 5 par heure et par utilisateur */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_invitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationsBody"];
+                };
+            };
+        };
+    };
+    create_invitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvitationPayload"];
+            };
+        };
+        responses: {
+            /** @description Invitation créée */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedInvitationBody"];
+                };
+            };
+            /** @description auth.reauth_required (rôle gérant) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.identifier_taken ou invitation.already_pending */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation.failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    accept_invitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptInvitationPayload"];
+            };
+        };
+        responses: {
+            /** @description Invitation acceptée */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginBody"];
+                };
+            };
+            /** @description auth.identifier_taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description invitation.expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.password_weak ou validation.failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    renew_invitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Identifiant de l'invitation */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nouvelle invitation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedInvitationBody"];
+                };
+            };
+            /** @description resource.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revoke_invitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Identifiant de l'invitation */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation révoquée */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationBody"];
+                };
+            };
+            /** @description resource.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    invitation_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Jeton de l'invitation */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation valable */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationPreviewBody"];
+                };
+            };
+            /** @description resource.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description invitation.expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     me: {
         parameters: {
             query?: never;
@@ -349,6 +1566,44 @@ export interface operations {
             };
             /** @description auth.unauthenticated */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    update_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMePayload"];
+            };
+        };
+        responses: {
+            /** @description Compte mis à jour */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBody"];
+                };
+            };
+            /** @description auth.reauth_required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.identifier_taken */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -387,6 +1642,100 @@ export interface operations {
             };
         };
     };
+    change_password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordPayload"];
+            };
+        };
+        responses: {
+            /** @description Changé ; cookie renouvelé */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.invalid_credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.password_weak */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    totp_begin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Secret en attente de confirmation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpEnrollmentBody"];
+                };
+            };
+            /** @description validation.failed (déjà activée) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    totp_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpConfirmPayload"];
+            };
+        };
+        responses: {
+            /** @description Activée ; codes de secours affichés une seule fois */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupCodesBody"];
+                };
+            };
+            /** @description auth.totp_invalid */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     organization: {
         parameters: {
             query?: never;
@@ -407,6 +1756,461 @@ export interface operations {
             };
             /** @description auth.forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_organization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchOrganizationPayload"];
+            };
+        };
+        responses: {
+            /** @description Organisation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationDetailBody"];
+                };
+            };
+            /** @description concurrency.version_mismatch */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description concurrency.version_required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_role_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Réglages */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleSettingsBody"];
+                };
+            };
+        };
+    };
+    put_role_setting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleSettingPayload"];
+            };
+        };
+        responses: {
+            /** @description Réglage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleSettingBody"];
+                };
+            };
+            /** @description concurrency.version_mismatch */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation.failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description concurrency.version_required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paramètres */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsBody"];
+                };
+            };
+        };
+    };
+    patch_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchSettingsPayload"];
+            };
+        };
+        responses: {
+            /** @description Paramètres */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsBody"];
+                };
+            };
+            /** @description concurrency.version_mismatch */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation.failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_support_grants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accords et consultations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportOverviewBody"];
+                };
+            };
+        };
+    };
+    create_support_grant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSupportGrantPayload"];
+            };
+        };
+        responses: {
+            /** @description Accord */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportGrantBody"];
+                };
+            };
+            /** @description auth.reauth_required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation.failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revoke_support_grant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Identifiant de l'accord */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accord révoqué */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportGrantBody"];
+                };
+            };
+            /** @description resource.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_users: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Membres */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembersBody"];
+                };
+            };
+            /** @description auth.forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    change_role: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Identifiant d'adhésion */
+                membership_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRolePayload"];
+            };
+        };
+        responses: {
+            /** @description Membre */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberBody"];
+                };
+            };
+            /** @description auth.reauth_required ou auth.forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description user.last_manager */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    disable_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Identifiant d'adhésion */
+                membership_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Membre désactivé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberBody"];
+                };
+            };
+            /** @description auth.reauth_required ou auth.forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description user.last_manager */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    enable_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Identifiant d'adhésion */
+                membership_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Membre réactivé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberBody"];
+                };
+            };
+            /** @description auth.reauth_required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    issue_reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Identifiant d'adhésion */
+                membership_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lien affiché une seule fois */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetLinkBody"];
+                };
+            };
+            /** @description auth.reauth_required ou auth.forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.rate_limited */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    set_unit_assignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Identifiant d'adhésion */
+                membership_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnitAssignmentsPayload"];
+            };
+        };
+        responses: {
+            /** @description Affectations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitAssignmentsBody"];
+                };
+            };
+            /** @description validation.failed */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

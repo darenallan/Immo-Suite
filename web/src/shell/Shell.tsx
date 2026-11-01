@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import type { Me } from '../api/client';
 import { useAuth } from '../auth';
+import { FeedbackDialog } from '../observation/FeedbackDialog';
 import { fr, type RoleKey } from '../texts/fr';
 import { NAV_ENTRIES, bottomBar, isRole, visibleEntries, type NavEntry } from './nav';
 
@@ -41,9 +42,12 @@ function Link({
 
 /** Coquille de navigation : menu latéral de 248 px à partir de 1024 px ; sinon barre du bas à 4 entrées dont « Plus » (UI_UX_DESIGN.md). */
 export function Shell({ me, path, navigate, children }: ShellProps) {
-  const { logout, logoutAll, selectOrganization, updateAvailable } = useAuth();
+  const { logout, logoutAll, selectOrganization, updateAvailable, csrf } = useAuth();
   const [userOpen, setUserOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [reference, setReference] = useState<string | undefined>(undefined);
+  const [copied, setCopied] = useState(false);
   const userButton = useRef<HTMLButtonElement>(null);
   const roleText = me.membership?.role ?? '';
   const role: RoleKey | undefined = isRole(roleText) ? roleText : undefined;
@@ -146,6 +150,16 @@ export function Shell({ me, path, navigate, children }: ShellProps) {
                 className="button button--secondary"
                 type="button"
                 onClick={() => {
+                  setUserOpen(false);
+                  setFeedbackOpen(true);
+                }}
+              >
+                {fr.menu.reportProblem}
+              </button>
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={() => {
                   void logoutAll();
                 }}
               >
@@ -208,10 +222,63 @@ export function Shell({ me, path, navigate, children }: ShellProps) {
                     />
                   </li>
                 ))}
+              <li>
+                <button
+                  className="nav__link"
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    setFeedbackOpen(true);
+                  }}
+                >
+                  {fr.menu.reportProblem}
+                </button>
+              </li>
             </ul>
           </div>
         )}
       </nav>
+      {feedbackOpen && (
+        <FeedbackDialog
+          csrf={csrf}
+          onClose={() => {
+            setFeedbackOpen(false);
+          }}
+          onSent={(ref) => {
+            setFeedbackOpen(false);
+            setCopied(false);
+            setReference(ref);
+          }}
+        />
+      )}
+      {reference !== undefined && (
+        <div className="toast" role="status">
+          <span>{fr.feedback.sent(reference)}</span>
+          <button
+            className="button button--small"
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(reference).then(
+                () => {
+                  setCopied(true);
+                },
+                () => undefined,
+              );
+            }}
+          >
+            {copied ? fr.feedback.copied : fr.feedback.copy}
+          </button>
+          <button
+            className="button button--small button--secondary"
+            type="button"
+            onClick={() => {
+              setReference(undefined);
+            }}
+          >
+            {fr.feedback.dismiss}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

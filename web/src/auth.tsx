@@ -11,17 +11,43 @@ import {
   type ReactNode,
 } from 'react';
 import { ApiProblem, api, type Me } from './api/client';
+import { installErrorCapture } from './observation/errors';
+import { configureObservation, installVisibilityFlush, resetObservation } from './observation/track';
+import { ConfirmDialog } from './screens/ConfirmDialog';
 
 export type AuthState =
   { status: 'loading' } | { status: 'anonymous'; notice: string | undefined } | { status: 'ready'; me: Me };
 
+/** Résultat d'une connexion : ouverte, ou second facteur à saisir (le défi vaut 5 minutes). */
+export type LoginResult = { status: 'ok' } | { status: 'mfa'; challenge: string };
+
+/** La confirmation par mot de passe a été abandonnée par la personne (modale fermée). */
+export class ConfirmCancelled extends Error {
+  constructor() {
+    super('confirmation annulée');
+    this.name = 'ConfirmCancelled';
+  }
+}
+
 interface AuthApi {
   state: AuthState;
   updateAvailable: boolean;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<LoginResult>;
+  verifyTotp: (challenge: string, code: string) => Promise<void>;
   selectOrganization: (id: string) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
+  /** Recharge le profil (droits, réglages) après une modification. */
+  reload: () => Promise<void>;
+  /** Jeton anti-falsification courant, pour les appels d'écriture. */
+  csrf: () => string;
+  /**
+   * Exécute une action à enjeu. Si le serveur répond uth.reauth_required, ouvre la modale « Confirmez votre mot de passe »,
+   * confirme, puis rejoue l'action une fois (F01 §9.6 point 2).
+   */
+  confirmed: <T>(action: (csrf: string) => Promise<T>) => Promise<T>;
+  /** Change son mot de passe ; la session est renouvelée par le serveur. */
+  changePassword: (current: string, next: string) => Promise<void>;
 }
 
 const Context = createContext<AuthApi | undefined>(undefined);
@@ -33,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const csrf = useRef<string | undefined>(undefined);
+  const [asking, setAsking] = useState<{ resolve: () => void; reject: () => void } | undefined>(undefined);
 
   const apply = useCallback((me: Me) => {
     csrf.current = me.csrf_token;
@@ -77,6 +104,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [apply, failed]);
 
+  // mesure d'usage et capture des erreurs (F39-observation) : tant qu'il n'y a pas de session, rien n'est envoyé
+  useEffect(() => {
+    const token = () => csrf.current;
+    configureObservation(token);
+    const stopErrors = installErrorCapture(token);
+    const stopFlush = installVisibilityFlush();
+    return () => {
+      stopErrors();
+      stopFlush();
+      resetObservation();
+    };
+  }, []);
+
   const ready = state.status === 'ready';
   useEffect(() => {
     if (!ready) return;
@@ -99,12 +139,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       state,
       updateAvailable,
       login: async (identifier, password) => {
+        let body;
         try {
-          await api.login(identifier, password);
+          body = await api.login(identifier, password);
         } catch (e) {
           if (e instanceof ApiProblem && e.code === 'client.upgrade_required') setUpdateAvailable(true);
           throw e;
         }
+        if (body.mfa_required && body.challenge !== null && body.challenge !== undefined) {
+          return { status: 'mfa', challenge: body.challenge };
+        }
+        apply(await api.me());
+        return { status: 'ok' };
+      },
+      verifyTotp: async (challenge, code) => {
+        await api.totpVerify(challenge, code);
+        apply(await api.me());
+      },
+      reload: async () => {
+        apply(await api.me());
+      },
+      csrf: () => csrf.current ?? '',
+      confirmed: async <T,>(action: (token: string) => Promise<T>): Promise<T> => {
+        try {
+          return await action(csrf.current ?? '');
+        } catch (e) {
+          if (!(e instanceof ApiProblem && e.code === 'auth.reauth_required')) throw e;
+        }
+        await new Promise<void>((resolve, reject) => {
+          setAsking({
+            resolve,
+            reject: () => {
+              reject(new ConfirmCancelled());
+            },
+          });
+        });
+        return action(csrf.current ?? '');
+      },
+      changePassword: async (current, next) => {
+        await api.changePassword(current, next, csrf.current ?? '');
         apply(await api.me());
       },
       selectOrganization: async (id) => {
@@ -130,7 +203,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [state, updateAvailable, apply, expire],
   );
 
-  return <Context.Provider value={value}>{children}</Context.Provider>;
+  return (
+    <Context.Provider value={value}>
+      {children}
+      {asking !== undefined && (
+        <ConfirmDialog
+          onConfirm={async (password) => {
+            await api.reauth(password, csrf.current ?? '');
+            asking.resolve();
+            setAsking(undefined);
+          }}
+          onCancel={() => {
+            asking.reject();
+            setAsking(undefined);
+          }}
+        />
+      )}
+    </Context.Provider>
+  );
 }
 
 export function useAuth(): AuthApi {
