@@ -243,6 +243,9 @@ Les messages de la colonne « Texte du front » reprennent `UI_UX_DESIGN.md` (Mi
 | `auth.reauth_required` | 403 | ✱ « Confirmez votre mot de passe pour continuer. » | `SECURITY.md` §3.4 |
 | `auth.totp_required`, `auth.totp_invalid` | 401 | ✱ « Saisissez le code de votre application d'authentification. » | `SECURITY.md` §3.4 |
 | `auth.identifier_taken` | 409 | « Cet identifiant a déjà un compte. Voulez-vous vous connecter ? » | F01 |
+| `auth.no_active_membership` | 403 | ✱ « Votre compte n'a accès à aucune organisation. Contactez votre gérant. » | F01, DP-85 |
+| `auth.organization_required` | 403 | ✱ « Choisissez une organisation pour continuer. » | F01, DP-85 |
+| `org.suspended` | 403 | ✱ « Cette organisation est suspendue. Contactez le support. » | F01, DP-85 |
 | `invitation.expired` | 410 | « Cette invitation a expiré (validité : 7 jours). Demandez au gérant de la renvoyer. » | F01 |
 | `resource.not_found` | 404 | « Introuvable. Cette page n'existe pas ou vous n'y avez pas accès. » | R-004 |
 | `feature.disabled`, `plan.feature_unavailable` | 403 | ✱ « Cette fonction n'est pas disponible pour votre organisation. » | R-082, `ARCHITECTURE.md` §8.2 |

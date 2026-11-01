@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | **Proposée le 01/11/2026, en attente de validation de Mimis** (aucun code écrit) |
+| Statut | **Validée par Mimis le 01/11/2026** avec les recommandations de la fiche (DP-85, DP-86) |
 | Étape | 02, `roadmap/etape-02-organisations-connexion-squelette.md` §4 point 2 |
 | Dépend de | DP-66 (compléments), DP-65 (plans), décision n° 45 ; `CONTEXTE.md` « Matrice de permissions » (source unique) ; `API_CONTRACTS.md` §4.6 ; `SECURITY.md` §4.1 à §4.3 |
 | Règles | R-081 (étape 03 pour le dernier gérant), R-082 (plans) |

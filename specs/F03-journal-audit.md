@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | **Proposée le 01/11/2026, en attente de validation de Mimis** (aucun code écrit) |
+| Statut | **Validée par Mimis le 01/11/2026** avec les recommandations de la fiche (DP-85, DP-86) |
 | Étape | 02, `roadmap/etape-02-organisations-connexion-squelette.md` §4 point 3 |
 | Dépend de | DP-47, DP-48, DP-60, DP-77 ; `SECURITY.md` §6.1 et §6.2 ; `DATABASE_SCHEMA.md` §4.2 et table `audit_log` |
 | Règles | R-004, R-007, R-008, R-009 |

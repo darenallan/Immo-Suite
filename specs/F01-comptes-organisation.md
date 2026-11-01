@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | **Proposée le 01/11/2026, en attente de validation de Mimis** (aucun code écrit) |
+| Statut | **Validée par Mimis le 01/11/2026** avec les recommandations de la fiche (DP-85, DP-86) |
 | Étape | 02, `roadmap/etape-02-organisations-connexion-squelette.md` §4 point 1 |
 | Dépend de | DP-48, DP-65, DP-68, DP-77 ; décisions n° 22, 45, 48, 49, 59 (à trancher, §8) ; `SECURITY.md` §3.1 à §3.3 ; `DATABASE_SCHEMA.md` §3 |
 | Règles | R-003, R-004 (`DOMAINE.md`) |
