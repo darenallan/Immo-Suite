@@ -1,0 +1,31 @@
+# Étape 3 « nocturne » : squelette (TESTING_QA.md §10). Les propriétés à 10 000 cas, la numérotation sous charge,
+# Lighthouse sur l'essai et le contrôle des sauvegardes s'y ajoutent aux étapes suivantes. NON EXÉCUTÉ à ce jour.
+name: nuit
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  proprietes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.99.1"
+      - uses: Swatinem/rust-cache@v2
+      - name: Propriétés de l'argent (10 000 cas par propriété)
+        run: cargo test -p immo-domain --locked --release
+  dependances:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit,cargo-deny
+      - run: cargo audit
+      - run: cargo deny check advisories

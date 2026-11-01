@@ -1,0 +1,38 @@
+# Caddy : certificats automatiques, HTTPS seulement, journal d'accès SANS jeton, ni en-tête d'autorisation, ni corps.
+{
+	# adresse électronique des avis de certificat : variable d'environnement ACME_EMAIL si définie
+	servers {
+		log_credentials false
+	}
+}
+
+{$PUBLIC_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output stdout
+		format filter {
+			wrap json
+			request>headers delete
+			request>uri query delete
+		}
+	}
+
+	# /ready n'est jamais exposé : réseau interne seulement
+	@interne path /ready /ready/*
+	respond @interne 404
+
+	@api path /health /api/*
+	reverse_proxy @api app:8080
+
+	root * /srv/web
+	try_files {path} /index.html
+	file_server
+}

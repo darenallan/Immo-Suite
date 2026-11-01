@@ -47,3 +47,6 @@ Thumbs.db
 # Sorties de test du front
 /web/playwright-report/
 /web/test-results/
+
+# Etat local du dernier deploiement
+/.deploy-state

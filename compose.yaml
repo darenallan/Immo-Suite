@@ -1,0 +1,69 @@
+# Déploiement sur un serveur unique (DEPLOYMENT.md §2). NON EXÉCUTÉ à ce jour (Docker absent du poste, hébergeur non choisi : C-02).
+# Les secrets viennent d'un fichier .env HORS du dépôt, propre à chaque environnement ; l'image est désignée par son EMPREINTE.
+#   IMMO_IMAGE=registre/immo@sha256:…   IMMO_OPS_IMAGE=registre/immo-ops@sha256:…   PUBLIC_HOST=essai.exemple.org
+name: immo
+
+x-app: &app
+  image: ${IMMO_IMAGE:?empreinte de l'image requise}
+  read_only: true
+  user: "10001:10001"
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  environment: &env
+    APP_ENV: ${APP_ENV:?}
+    PUBLIC_BASE_URL: https://${PUBLIC_HOST:?}
+    DATABASE_URL: ${DATABASE_URL:?}
+    BIND_ADDR: 0.0.0.0:8080
+    RUST_LOG: info
+
+services:
+  app:
+    <<: *app
+    command: ["serve"]
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/immo", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [interne, exposition]
+
+  worker:
+    <<: *app
+    command: ["work"]
+    networks: [interne]
+
+  # Copie le front construit dans un volume lu par Caddy, puis s'arrête.
+  assets:
+    image: ${IMMO_IMAGE}
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["cp -r /srv/web/. /assets/"]
+    user: "10001:10001"
+    volumes: ["assets:/assets"]
+    restart: "no"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?}
+    volumes:
+      - ./ops/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - assets:/srv/web:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      assets: { condition: service_completed_successfully }
+      app: { condition: service_started }
+    networks: [exposition]
+
+networks:
+  interne:
+  exposition:
+
+volumes:
+  assets:
+  caddy_data:
+  caddy_config:

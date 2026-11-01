@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Hook local (étape 01, §5.7) : formatage, lint rapide et détection de secrets avant chaque commit.
+# Installation : git config core.hooksPath ops/hooks
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+bash ops/ci/scan-secrets.sh
+cargo fmt --all --check
+if git diff --cached --name-only | grep -q '^web/'; then
+  npm run format:check --prefix web --silent
+fi

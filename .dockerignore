@@ -1,0 +1,14 @@
+target
+**/node_modules
+web/dist
+web/playwright-report
+web/test-results
+spikes
+maquette
+film
+flyer
+infographie
+site
+logo
+.git
+*.docx

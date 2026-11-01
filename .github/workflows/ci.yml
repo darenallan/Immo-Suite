@@ -1,0 +1,102 @@
+# CI des demandes de fusion (TESTING_QA.md §10). NON EXÉCUTÉE à ce jour : aucune plateforme n'est encore reliée (C-01).
+# Étape 1 « PR rapide » (≤ 10 min) puis étape 2 « PR intégration » (≤ 15 min, PostgreSQL réel et rôles de production).
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  rapide:
+    name: 1 · PR rapide
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Détection de secrets (historique complet)
+        run: bash ops/ci/scan-secrets.sh --history
+      - name: Migrations immuables
+        if: github.event_name == 'pull_request'
+        run: bash ops/ci/check-migrations.sh "origin/${{ github.base_ref }}"
+      - name: Essais des contrôles eux-mêmes
+        run: bash ops/ci/test-check-migrations.sh && bash ops/ci/test-scan-secrets.sh
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.99.1"
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests sans base (domaine, application, serveur)
+        run: cargo test --workspace --locked --exclude immo-db-tests
+      - name: Contrat OpenAPI à jour
+        run: cargo run -q -p immo-server --locked -- openapi openapi.generated.json && diff -u openapi.json openapi.generated.json
+      - name: Requêtes vérifiées (si des macros sqlx sont utilisées)
+        run: test ! -d .sqlx || cargo sqlx prepare --check --workspace
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit,cargo-deny
+      - run: cargo audit
+      - run: cargo deny check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - run: npm run lint --prefix web
+      - run: npm run format:check --prefix web
+      - run: npm run typecheck --prefix web
+      - run: npm test --prefix web
+      - name: Client d'API à jour
+        run: npm run api:check --prefix web
+      - run: npm audit --omit=dev --audit-level=high --prefix web
+      - run: npm run size --prefix web
+
+  integration:
+    name: 2 · PR intégration
+    needs: rapide
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci-only
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_PG_HOST: 127.0.0.1
+      TEST_PG_PORT: "5433"
+      TEST_PG_PASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.99.1"
+      - uses: Swatinem/rust-cache@v2
+      - name: Tests de base (rôles de production, isolation, pool, sauvegarde, file de tâches)
+        run: cargo test -p immo-db-tests --locked -- --test-threads=4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - run: npx --prefix web playwright install --with-deps chromium
+      - name: Parcours de bout en bout (390 px et 1440 px)
+        run: npm run test:e2e --prefix web
+        env:
+          PW_CHANNEL: chromium
