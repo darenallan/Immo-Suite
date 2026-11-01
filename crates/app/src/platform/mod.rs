@@ -10,4 +10,5 @@ pub mod db;
 pub mod file_store;
 pub mod jobs;
 pub mod mailer;
+pub mod ops;
 pub mod pdf;
