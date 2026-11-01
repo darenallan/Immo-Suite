@@ -2,6 +2,9 @@
 //! en liste blanche, contrat OpenAPI généré.
 
 pub mod api;
+pub mod api_account;
+pub mod api_admin;
+pub mod api_observation;
 pub mod extract;
 pub mod http;
 pub mod limiter;

@@ -149,7 +149,13 @@ async fn serve() -> ExitCode {
         Arc::new(SystemClock),
         settings.session_secret.expose().as_bytes().to_vec(),
     )
-    .with_idle_minutes(settings.session_idle_minutes);
+    .with_idle_minutes(settings.session_idle_minutes)
+    .with_field_key(
+        settings
+            .field_encryption_key
+            .as_ref()
+            .and_then(|k| immo_app::identity::crypto::FieldKey::from_hex(k.expose()).ok()),
+    );
     let mut probes: Vec<Arc<dyn Probe>> = vec![Arc::new(DbProbe(db))];
     match &config.file_store_dir {
         Some(dir) => probes.push(Arc::new(StoreProbe(DiskFileStore::new(dir.clone())))),
@@ -157,12 +163,18 @@ async fn serve() -> ExitCode {
             "aucun stockage de fichiers configuré : le stockage objet arrive après le choix du fournisseur (DP-70)"
         ),
     }
-    let state = AppState::new(probes, version()).with_identity(
-        identity,
-        settings.allowed_origins,
-        settings.trust_proxy,
-        settings.min_client_version,
-    );
+    let production = config.environment == immo_app::platform::config::Environment::Production;
+    let state = AppState::new(probes, version())
+        .with_identity(
+            identity,
+            settings.allowed_origins,
+            settings.trust_proxy,
+            settings.min_client_version,
+        )
+        .with_public_base_url(config.public_base_url.as_deref().unwrap_or("http://localhost:8080"))
+        // F39-observation : événement écarté = 422 hors production ; route d'essai jamais en production
+        .with_strict_events(!production)
+        .with_test_routes(!production && std::env::var("ENABLE_TEST_ROUTES").is_ok_and(|v| v == "1"));
     let app = http::router(Arc::new(state));
     let listener = match tokio::net::TcpListener::bind(config.bind_addr).await {
         Ok(l) => l,

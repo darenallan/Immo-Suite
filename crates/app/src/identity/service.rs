@@ -18,6 +18,7 @@ use sqlx::{PgConnection, Row};
 use uuid::Uuid;
 
 use super::authorize::{Plan, Role};
+use super::crypto::FieldKey;
 use super::identifier::Identifier;
 use super::password::{MAX_CHARS, PasswordService};
 use super::session::{
@@ -25,6 +26,7 @@ use super::session::{
 };
 use super::throttle::{identifier_wait, ip_wait, retry_after_seconds};
 use crate::audit::{self, AuditAction, AuditContext, AuditEntry};
+use crate::observation::events::ProductEvent;
 use crate::platform::clock::Clock;
 use crate::platform::db::{Db, DbError};
 
@@ -96,6 +98,12 @@ pub struct Authenticated {
     pub org: Option<ActiveOrg>,
     pub role: Option<Role>,
     pub session_absolute_expires_at: DateTime<Utc>,
+    /// Adhésion de l'appelant dans l'organisation active (interdit de se retirer soi-même, F02 §7.2).
+    pub membership_id: Option<Uuid>,
+    /// Le mot de passe a été confirmé depuis moins de 5 minutes (`sessions.reauth_until`, F01 §9.6).
+    pub reauth_valid: bool,
+    /// Droits réglables accordés à ce rôle, lus dans la transaction de la requête (F02 §7.1) : `record_payment`, `import_data`…
+    pub granted_settings: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -106,6 +114,11 @@ pub enum LoginError {
         retry_after_seconds: i64,
     },
     NoActiveMembership,
+    /// Pas une erreur : le mot de passe est juste mais le compte a une double authentification. Aucune session n'est créée ;
+    /// `challenge` (défi signé de 5 minutes) se présente à `POST /auth/totp/verify` avec le code (F01 §9.5).
+    MfaRequired {
+        challenge: String,
+    },
     Internal,
 }
 
@@ -130,18 +143,21 @@ impl From<DbError> for LoginError {
     }
 }
 
-fn internal<E: std::fmt::Display>(e: E) -> DbError {
+pub(super) fn internal<E: std::fmt::Display>(e: E) -> DbError {
     // Les erreurs de décodage ne citent jamais de valeur.
     DbError::Query(sqlx::Error::Decode(e.to_string().into()))
 }
 
-/// Service d'identité. Cloner est peu coûteux.
+/// Service d'identité. Cloner est peu coûteux. Les champs sont visibles des modules frères (`account`, `members`, `support`…) :
+/// ils prolongent ce service sans en exposer l'intérieur à l'extérieur de `identity`.
 #[derive(Clone)]
 pub struct IdentityService {
-    db: Db,
-    passwords: PasswordService,
-    clock: Arc<dyn Clock>,
-    secret: Arc<Vec<u8>>,
+    pub(super) db: Db,
+    pub(super) passwords: PasswordService,
+    pub(super) clock: Arc<dyn Clock>,
+    pub(super) secret: Arc<Vec<u8>>,
+    /// Clé de chiffrement des champs (secret TOTP, codes de secours). Absente : la double authentification est indisponible.
+    pub(super) field_key: Option<FieldKey>,
     /// Durée d'inactivité forcée, en minutes (essai seulement : exercer l'expiration).
     idle_override: Option<i64>,
 }
@@ -152,17 +168,17 @@ impl std::fmt::Debug for IdentityService {
     }
 }
 
-fn micros(t: DateTime<Utc>) -> String {
+pub(super) fn micros(t: DateTime<Utc>) -> String {
     t.to_rfc3339()
 }
 
-fn from_micros(value: i64) -> Result<DateTime<Utc>, DbError> {
+pub(super) fn from_micros(value: i64) -> Result<DateTime<Utc>, DbError> {
     DateTime::from_timestamp_micros(value).ok_or_else(|| internal("heure illisible"))
 }
 
 const EPOCH_MICROS: &str = "(extract(epoch from {c}) * 1000000)::bigint";
 
-fn at(column: &str) -> String {
+pub(super) fn at(column: &str) -> String {
     EPOCH_MICROS.replace("{c}", column)
 }
 
@@ -173,8 +189,15 @@ impl IdentityService {
             passwords,
             clock,
             secret: Arc::new(secret),
+            field_key: None,
             idle_override: None,
         }
+    }
+
+    /// Clé de chiffrement des champs, lue de l'environnement (`FIELD_ENCRYPTION_KEY`).
+    pub fn with_field_key(mut self, key: Option<FieldKey>) -> Self {
+        self.field_key = key;
+        self
     }
 
     /// Force la durée d'inactivité (minutes), pour exercer l'expiration en essai. Les réglages l'interdisent en production.
@@ -262,20 +285,15 @@ impl IdentityService {
         let ip = req.client.ip;
 
         // 1. limitation : aucune vérification de mot de passe pendant une attente, et la requête ne compte pas
-        {
-            let mut tx = self.db.begin_system().await?;
-            let id_failures = self.consecutive_failures(tx.conn(), &key).await?;
-            let ip_failures = match ip {
-                Some(ip) => self.recent_ip_failures(tx.conn(), ip, now).await?,
-                None => vec![],
-            };
-            tx.commit().await?;
-            let wait = retry_after_seconds(identifier_wait(&id_failures, now), ip_wait(&ip_failures, now));
-            if let Some(seconds) = wait {
-                return Err(LoginError::RateLimited {
-                    retry_after_seconds: seconds,
-                });
+        if let Some(seconds) = self.login_wait(&key, ip, now).await? {
+            if let Some(id) = &parsed
+                && let Ok(Some(known)) = self.find_user(id).await
+            {
+                self.observe_user_detached(known.id, ProductEvent::login_failed("rate_limited"));
             }
+            return Err(LoginError::RateLimited {
+                retry_after_seconds: seconds,
+            });
         }
 
         // 2. recherche du compte et vérification (factice si le compte n'existe pas, est désactivé ou n'a pas de mot de passe)
@@ -283,6 +301,7 @@ impl IdentityService {
             Some(id) => self.find_user(id).await?,
             None => None,
         };
+        let known_id = user.as_ref().map(|u| u.id);
         let too_long = req.password.chars().count() > MAX_CHARS;
         let stored_hash = user
             .as_ref()
@@ -299,6 +318,10 @@ impl IdentityService {
 
         let Some(user) = user.filter(|_| verified) else {
             self.record_failure(&key, ip, now, parsed.as_ref()).await?;
+            if let Some(id) = known_id {
+                // en arrière-plan : la durée de la réponse ne distingue pas un compte connu d'un compte inconnu (F01, SECURITY.md §3.3)
+                self.observe_user_detached(id, ProductEvent::login_failed("bad_credentials"));
+            }
             return Err(LoginError::InvalidCredentials);
         };
 
@@ -311,15 +334,40 @@ impl IdentityService {
             tx.commit().await?;
             return Err(LoginError::NoActiveMembership);
         };
+        let _ = first;
 
+        // double authentification : le mot de passe est juste, mais aucune session n'est créée avant le code (F01 §9.5 point 6)
+        if user.totp_enabled {
+            let challenge = self.make_challenge(user.id, &key, now).ok_or(LoginError::Internal)?;
+            return Err(LoginError::MfaRequired { challenge });
+        }
+        self.finish_login(&user, &key, &req.client, orgs, None).await
+    }
+
+    /// Ouvre la session après un mot de passe juste (et, le cas échéant, un second facteur) : tentative réussie, session, dernier
+    /// accès, ligne `auth.login`. Une seule organisation : tout dans sa transaction (R-008). Plusieurs : session sans organisation
+    /// active, `auth.login` est écrit au premier choix. `backup_remaining` : connexion par un code de secours (reste combien).
+    pub(super) async fn finish_login(
+        &self,
+        user: &UserRow,
+        key: &[u8; 32],
+        client: &ClientInfo,
+        orgs: Vec<OrgChoice>,
+        backup_remaining: Option<usize>,
+    ) -> Result<SessionGrant, LoginError> {
+        let now = self.clock.now();
+        let ip = client.ip;
         let token = generate_token().map_err(|_| LoginError::Internal)?;
         let csrf = self.csrf_for(&token);
         let absolute = absolute_expiry(now);
+        let view = UserView {
+            id: user.id,
+            display_name: user.display_name.clone(),
+        };
 
         if let [only] = orgs.as_slice() {
-            // une seule organisation : tout (tentative, session, audit) dans la transaction de cette organisation (R-008)
             let mut tx = self.db.begin(only.id, user.id).await?;
-            self.insert_attempt(tx.conn(), &key, ip, true, now).await?;
+            self.insert_attempt(tx.conn(), key, ip, true, now).await?;
             self.insert_session(
                 tx.conn(),
                 &token,
@@ -328,7 +376,7 @@ impl IdentityService {
                 only.role,
                 now,
                 absolute,
-                &req.client,
+                client,
             )
             .await?;
             sqlx::query("UPDATE users SET last_login_at = $2::timestamptz WHERE id = $1::uuid")
@@ -340,34 +388,26 @@ impl IdentityService {
             let entry = AuditEntry::new(AuditAction::AuthLogin, "user", user.id)
                 .after(json!({ "org_role": only.role.as_str() }))
                 .map_err(|_| LoginError::Internal)?;
-            audit::record(&mut tx, &audit_context(user.id, &req.client), entry).await?;
+            audit::record(&mut tx, &audit_context(user.id, client), entry).await?;
+            if let Some(remaining) = backup_remaining {
+                let entry = AuditEntry::new(AuditAction::AuthMfaBackupUsed, "user", user.id)
+                    .after(json!({ "remaining": remaining }))
+                    .map_err(|_| LoginError::Internal)?;
+                audit::record(&mut tx, &audit_context(user.id, client), entry).await?;
+            }
             tx.commit().await?;
             Ok(SessionGrant {
                 session_token: token,
                 csrf_token: csrf,
-                user: UserView {
-                    id: user.id,
-                    display_name: user.display_name,
-                },
+                user: view,
                 active_org: Some(only.id),
                 organizations: orgs,
             })
         } else {
-            // plusieurs organisations : session sans organisation active ; `auth.login` est écrit au premier choix
-            let _ = first;
             let mut tx = self.db.begin_system().await?;
-            self.insert_attempt(tx.conn(), &key, ip, true, now).await?;
-            self.insert_session(
-                tx.conn(),
-                &token,
-                user.id,
-                None,
-                Role::Cashier,
-                now,
-                absolute,
-                &req.client,
-            )
-            .await?;
+            self.insert_attempt(tx.conn(), key, ip, true, now).await?;
+            self.insert_session(tx.conn(), &token, user.id, None, Role::Cashier, now, absolute, client)
+                .await?;
             sqlx::query("UPDATE users SET last_login_at = $2::timestamptz WHERE id = $1::uuid")
                 .bind(user.id.to_string())
                 .bind(micros(now))
@@ -375,45 +415,107 @@ impl IdentityService {
                 .await
                 .map_err(DbError::from)?;
             tx.commit().await?;
+            if let Some(remaining) = backup_remaining {
+                self.audit_account(
+                    user.id,
+                    AuditAction::AuthMfaBackupUsed,
+                    json!({ "remaining": remaining }),
+                    None,
+                    client,
+                )
+                .await;
+            }
             Ok(SessionGrant {
                 session_token: token,
                 csrf_token: csrf,
-                user: UserView {
-                    id: user.id,
-                    display_name: user.display_name,
-                },
+                user: view,
                 active_org: None,
                 organizations: orgs,
             })
         }
     }
 
-    async fn find_user(&self, id: &Identifier) -> Result<Option<UserRow>, DbError> {
+    /// Attente restante (secondes) avant de pouvoir tenter une connexion : identifiant et adresse (SECURITY.md §3.3).
+    pub(super) async fn login_wait(
+        &self,
+        key: &[u8; 32],
+        ip: Option<IpAddr>,
+        now: DateTime<Utc>,
+    ) -> Result<Option<i64>, DbError> {
+        let mut tx = self.db.begin_system().await?;
+        let id_failures = self.consecutive_failures(tx.conn(), key).await?;
+        let ip_failures = match ip {
+            Some(ip) => self.recent_ip_failures(tx.conn(), ip, now).await?,
+            None => vec![],
+        };
+        tx.commit().await?;
+        Ok(retry_after_seconds(
+            identifier_wait(&id_failures, now),
+            ip_wait(&ip_failures, now),
+        ))
+    }
+
+    /// Écrit une action de COMPTE (mot de passe, TOTP, téléphone) dans l'audit de chaque organisation où la personne a une adhésion
+    /// active, sauf `exclude` (déjà écrite dans la transaction de l'action, R-008). Meilleur effort : un échec est journalisé.
+    pub(super) async fn audit_account(
+        &self,
+        user_id: Uuid,
+        action: AuditAction,
+        after: serde_json::Value,
+        exclude: Option<Uuid>,
+        client: &ClientInfo,
+    ) {
+        let Ok(orgs) = self.my_organizations(user_id).await else {
+            tracing::error!("identité : organisations illisibles, action de compte non tracée");
+            return;
+        };
+        for org in orgs.into_iter().filter(|o| Some(o.id) != exclude) {
+            let result: Result<(), DbError> = async {
+                let mut tx = self.db.begin(org.id, user_id).await?;
+                let entry = AuditEntry::new(action, "user", user_id)
+                    .after(after.clone())
+                    .map_err(internal)?;
+                audit::record(&mut tx, &audit_context(user_id, client), entry).await?;
+                tx.commit().await
+            }
+            .await;
+            if let Err(e) = result {
+                tracing::error!(error = %e, "identité : action de compte non tracée");
+            }
+        }
+    }
+
+    pub(super) async fn find_user(&self, id: &Identifier) -> Result<Option<UserRow>, DbError> {
         let column = match id {
             Identifier::Phone(_) => "login_phone",
             Identifier::Email(_) => "login_email",
         };
         let mut tx = self.db.begin_system().await?;
         let row = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "SELECT id::text, display_name, password_hash, status FROM users WHERE {column} = $1"
+            "SELECT id::text, display_name, password_hash, status, totp_enabled_at IS NOT NULL, login_phone, login_email FROM users WHERE {column} = $1"
         )))
         .bind(id.as_str())
         .fetch_optional(tx.conn())
         .await?;
         tx.commit().await?;
-        row.map(|r| {
-            Ok(UserRow {
-                id: Uuid::parse_str(&r.get::<String, _>(0)).map_err(internal)?,
-                display_name: r.get(1),
-                password_hash: r.get(2),
-                active: r.get::<String, _>(3) == "active",
-            })
-        })
-        .transpose()
+        row.map(|r| user_row(&r)).transpose()
+    }
+
+    /// Le compte par son identifiant interne (hors connexion : défi TOTP, changement de mot de passe).
+    pub(super) async fn find_user_by_id(&self, id: Uuid) -> Result<Option<UserRow>, DbError> {
+        let mut tx = self.db.begin_system().await?;
+        let row = sqlx::query(
+            "SELECT id::text, display_name, password_hash, status, totp_enabled_at IS NOT NULL, login_phone, login_email FROM users WHERE id = $1::uuid",
+        )
+        .bind(id.to_string())
+        .fetch_optional(tx.conn())
+        .await?;
+        tx.commit().await?;
+        row.map(|r| user_row(&r)).transpose()
     }
 
     /// Échecs consécutifs depuis la dernière réussite, du plus récent au plus ancien (20 au plus).
-    async fn consecutive_failures(
+    pub(super) async fn consecutive_failures(
         &self,
         conn: &mut PgConnection,
         key: &[u8; 32],
@@ -451,7 +553,7 @@ impl IdentityService {
         rows.iter().map(|r| from_micros(r.get::<i64, _>(0))).collect()
     }
 
-    async fn insert_attempt(
+    pub(super) async fn insert_attempt(
         &self,
         conn: &mut PgConnection,
         key: &[u8; 32],
@@ -491,7 +593,7 @@ impl IdentityService {
     }
 
     /// Meilleur effort : un échec d'écriture ici ne change pas la réponse à l'appelant, mais il est journalisé.
-    async fn trace_rate_limit(&self, user_id: Uuid, ip: Option<IpAddr>) {
+    pub(super) async fn trace_rate_limit(&self, user_id: Uuid, ip: Option<IpAddr>) {
         let Ok(orgs) = self.my_organizations(user_id).await else {
             return;
         };
@@ -519,7 +621,7 @@ impl IdentityService {
     // ───────── organisations et sessions ─────────
 
     /// Adhésions actives de l'utilisateur, avec les champs d'affichage de leurs organisations (fonction `my_organizations`).
-    async fn my_organizations(&self, user_id: Uuid) -> Result<Vec<OrgChoice>, DbError> {
+    pub(super) async fn my_organizations(&self, user_id: Uuid) -> Result<Vec<OrgChoice>, DbError> {
         let mut tx = self.db.begin_user(user_id).await?;
         let rows = sqlx::query("SELECT org_id::text, org_name, plan, kind, lifecycle, role FROM my_organizations()")
             .fetch_all(tx.conn())
@@ -540,7 +642,7 @@ impl IdentityService {
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn insert_session(
+    pub(super) async fn insert_session(
         &self,
         conn: &mut PgConnection,
         token: &str,
@@ -583,10 +685,11 @@ impl IdentityService {
         let run = async {
             let mut tx = self.db.begin_system().await?;
             let sql = format!(
-                "SELECT s.user_id::text, s.org_id::text, u.display_name, u.status, {} \
+                "SELECT s.user_id::text, s.org_id::text, u.display_name, u.status, {}, {} \
                    FROM sessions s JOIN users u ON u.id = s.user_id \
                   WHERE s.id_hash = $1 AND s.revoked_at IS NULL AND s.idle_expires_at > $2::timestamptz AND s.absolute_expires_at > $2::timestamptz",
-                at("s.absolute_expires_at")
+                at("s.absolute_expires_at"),
+                at("s.reauth_until")
             );
             let row = sqlx::query(sqlx::AssertSqlSafe(sql))
                 .bind(id_hash.to_vec())
@@ -605,21 +708,38 @@ impl IdentityService {
                 display_name: row.get(2),
             };
             let absolute = from_micros(row.get::<i64, _>(4))?;
+            let reauth_valid = row
+                .get::<Option<i64>, _>(5)
+                .map(from_micros)
+                .transpose()?
+                .is_some_and(|until| until > now);
             if row.get::<String, _>(3) != "active" {
                 self.revoke(&id_hash, now).await?;
                 return Ok(None);
             }
+            let mut membership_id = None;
+            let mut granted_settings = vec![];
             let (org, role) = match org_id {
                 None => (None, None),
                 Some(org_id) => {
                     let mut tx = self.db.begin(org_id, user_id).await?;
                     let found = sqlx::query(
-                        "SELECT m.role, m.status, o.name, o.plan, o.kind, o.lifecycle FROM memberships m \
+                        "SELECT m.role, m.status, o.name, o.plan, o.kind, o.lifecycle, m.id::text FROM memberships m \
                            JOIN organizations o ON o.id = m.org_id WHERE m.user_id = $1::uuid AND m.org_id = current_org_id()",
                     )
                     .bind(user_id.to_string())
                     .fetch_optional(tx.conn())
                     .await?;
+                    // droits réglables de ce rôle, lus dans la transaction de la requête : aucun cache (F02 §7.1 point 4)
+                    if let Some(r) = found.as_ref() {
+                        granted_settings = sqlx::query_scalar::<_, String>(
+                            "SELECT action FROM role_settings WHERE role = $1 AND allowed ORDER BY action",
+                        )
+                        .bind(r.get::<String, _>(0))
+                        .fetch_all(tx.conn())
+                        .await?;
+                        membership_id = Uuid::parse_str(&r.get::<String, _>(6)).ok();
+                    }
                     tx.commit().await?;
                     let usable = found
                         .as_ref()
@@ -663,11 +783,18 @@ impl IdentityService {
                 org,
                 role,
                 session_absolute_expires_at: absolute,
+                membership_id,
+                reauth_valid,
+                granted_settings,
             }))
         };
         match run.await {
             Ok(Some(a)) => Ok(a),
-            Ok(None) => Err(AuthError::Unauthenticated),
+            Ok(None) => {
+                // session échue : une trace d'usage, puis révocation pour ne l'écrire qu'une fois (F39-observation)
+                self.observe_session_expired(token, now).await;
+                Err(AuthError::Unauthenticated)
+            }
             Err(e) => {
                 tracing::error!(error = %e, "identité : authentification impossible");
                 Err(AuthError::Internal)
@@ -675,7 +802,7 @@ impl IdentityService {
         }
     }
 
-    async fn revoke(&self, id_hash: &[u8; 32], now: DateTime<Utc>) -> Result<(), DbError> {
+    pub(super) async fn revoke(&self, id_hash: &[u8; 32], now: DateTime<Utc>) -> Result<(), DbError> {
         let mut tx = self.db.begin_system().await?;
         sqlx::query("UPDATE sessions SET revoked_at = $2::timestamptz WHERE id_hash = $1 AND revoked_at IS NULL")
             .bind(id_hash.to_vec())
@@ -762,13 +889,29 @@ impl IdentityService {
         wanted: Uuid,
         client: &ClientInfo,
     ) -> Result<(), DbError> {
+        self.trace_missing(active_org, user_id, "organization", wanted, client)
+            .await
+    }
+
+    /// Chemin « introuvable » d'une ressource demandée par identifiant : si elle existe chez une autre organisation (liste blanche
+    /// `cross_org_registry`, booléen seulement), écrit `security.cross_org_attempt` chez l'appelant et lève l'alerte (DP-86, R-004).
+    /// Un identifiant qui n'existe nulle part ne laisse aucune trace.
+    pub(super) async fn trace_missing(
+        &self,
+        active_org: Uuid,
+        user_id: Uuid,
+        object_type: &'static str,
+        wanted: Uuid,
+        client: &ClientInfo,
+    ) -> Result<(), DbError> {
         let mut tx = self.db.begin(active_org, user_id).await?;
-        let exists: bool = sqlx::query_scalar("SELECT exists_in_other_org('organization', $1::uuid)")
+        let exists: bool = sqlx::query_scalar("SELECT exists_in_other_org($1, $2::uuid)")
+            .bind(object_type)
             .bind(wanted.to_string())
             .fetch_one(tx.conn())
             .await?;
         if exists {
-            let entry = AuditEntry::new(AuditAction::SecurityCrossOrgAttempt, "organization", wanted);
+            let entry = AuditEntry::new(AuditAction::SecurityCrossOrgAttempt, object_type, wanted);
             audit::record(&mut tx, &audit_context(user_id, client), entry).await?;
             // alerte immédiate (S1) : ligne de journal structurée, sans donnée personnelle ; le canal viendra avec la dette de l'étape 01
             tracing::error!(alert = "security.cross_org_attempt", org_id = %active_org, "tentative d'accès à une autre organisation");
@@ -841,14 +984,41 @@ impl IdentityService {
     }
 }
 
-struct UserRow {
-    id: Uuid,
-    display_name: String,
-    password_hash: Option<String>,
-    active: bool,
+/// Le compte tel que la connexion et les opérations de compte le lisent.
+pub(super) struct UserRow {
+    pub(super) id: Uuid,
+    pub(super) display_name: String,
+    pub(super) password_hash: Option<String>,
+    pub(super) active: bool,
+    pub(super) totp_enabled: bool,
+    pub(super) login_phone: Option<String>,
+    pub(super) login_email: Option<String>,
 }
 
-fn audit_context(user_id: Uuid, client: &ClientInfo) -> AuditContext {
+impl UserRow {
+    /// L'identifiant normalisé (téléphone de préférence) : sert de clé de limitation et de texte de comparaison pour les règles de
+    /// choix d'un mot de passe.
+    pub(super) fn identifier(&self) -> Option<Identifier> {
+        self.login_phone
+            .clone()
+            .map(Identifier::Phone)
+            .or_else(|| self.login_email.clone().map(Identifier::Email))
+    }
+}
+
+fn user_row(r: &sqlx::postgres::PgRow) -> Result<UserRow, DbError> {
+    Ok(UserRow {
+        id: Uuid::parse_str(&r.get::<String, _>(0)).map_err(internal)?,
+        display_name: r.get(1),
+        password_hash: r.get(2),
+        active: r.get::<String, _>(3) == "active",
+        totp_enabled: r.get(4),
+        login_phone: r.get(5),
+        login_email: r.get(6),
+    })
+}
+
+pub(super) fn audit_context(user_id: Uuid, client: &ClientInfo) -> AuditContext {
     AuditContext {
         actor_user_id: Some(user_id),
         ip: client.ip,

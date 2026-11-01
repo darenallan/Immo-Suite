@@ -5,4 +5,5 @@
 
 pub mod audit;
 pub mod identity;
+pub mod observation;
 pub mod platform;

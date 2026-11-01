@@ -18,6 +18,9 @@ pub struct HttpSettings {
     /// Durée d'inactivité forcée, en minutes, pour exercer l'expiration en essai ; refusée en production.
     pub session_idle_minutes: Option<i64>,
     pub argon2: HashParams,
+    /// Clé de chiffrement des champs (64 caractères hexadécimaux). Obligatoire en production ; sans elle, la double
+    /// authentification est indisponible (DP-88).
+    pub field_encryption_key: Option<Secret>,
 }
 
 fn origin_of(url: &str) -> Option<String> {
@@ -127,6 +130,21 @@ impl HttpSettings {
                 reason: "paramètres argon2id hors bornes",
             });
         }
+        let field_encryption_key = match non_empty("FIELD_ENCRYPTION_KEY") {
+            Some(k) => {
+                if immo_app::identity::crypto::FieldKey::from_hex(&k).is_err() {
+                    return Err(ConfigError::Invalid {
+                        name: "FIELD_ENCRYPTION_KEY",
+                        reason: "64 caractères hexadécimaux (32 octets)",
+                    });
+                }
+                Some(Secret::new(k))
+            }
+            None if config.environment == Environment::Production => {
+                return Err(ConfigError::Missing("FIELD_ENCRYPTION_KEY"));
+            }
+            None => None,
+        };
         Ok(Self {
             session_secret: Secret::new(secret),
             allowed_origins,
@@ -134,6 +152,7 @@ impl HttpSettings {
             min_client_version: non_empty("MIN_CLIENT_VERSION").unwrap_or_else(|| "0.0.0".to_string()),
             session_idle_minutes,
             argon2,
+            field_encryption_key,
         })
     }
 }

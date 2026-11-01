@@ -1,0 +1,92 @@
+{
+  "events": [
+    {
+      "name": "screen_viewed",
+      "origin": "client",
+      "properties": {
+        "screen": "screen",
+        "width_class": "choice(mobile|tablet|desktop)"
+      }
+    },
+    {
+      "name": "validation_error",
+      "origin": "client",
+      "properties": {
+        "field": "field_id",
+        "rule_code": "code",
+        "screen": "screen"
+      }
+    },
+    {
+      "name": "permission_denied",
+      "origin": "server",
+      "properties": {
+        "action": "code",
+        "role": "choice(manager|property_manager|cashier|field_agent|accountant|owner|collaborator)"
+      }
+    },
+    {
+      "name": "slow_response",
+      "origin": "server",
+      "properties": {
+        "duration_ms": "int(0..3600000)",
+        "method": "choice(GET|POST|PUT|PATCH|DELETE)",
+        "route": "route",
+        "status": "int(100..599)"
+      }
+    },
+    {
+      "name": "client_error",
+      "origin": "server",
+      "properties": {
+        "code": "choice(TypeError|RangeError|ReferenceError|SyntaxError|unhandled_rejection|other)",
+        "screen": "screen"
+      }
+    },
+    {
+      "name": "login_failed",
+      "origin": "server",
+      "properties": {
+        "reason": "choice(bad_credentials|rate_limited|totp_failed|reauth_failed)"
+      }
+    },
+    {
+      "name": "session_expired",
+      "origin": "server",
+      "properties": {
+        "reason": "choice(idle|absolute)"
+      }
+    },
+    {
+      "name": "password_reset_requested",
+      "origin": "server",
+      "properties": {
+        "channel": "choice(admin_link|self_service)"
+      }
+    },
+    {
+      "name": "feedback_submitted",
+      "origin": "server",
+      "properties": {
+        "category": "choice(bug|request|question)",
+        "screen": "screen"
+      }
+    },
+    {
+      "name": "event_discarded",
+      "origin": "server",
+      "properties": {
+        "count": "int(1..1000)",
+        "reason": "choice(unknown_name|bad_property|server_origin|batch_overflow)"
+      }
+    }
+  ],
+  "forbidden_in_values": [
+    "@",
+    "+226",
+    "6 chiffres de suite ou plus"
+  ],
+  "max_batch": 20,
+  "max_batch_bytes": 8192,
+  "version": 1
+}

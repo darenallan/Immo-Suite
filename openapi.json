@@ -2,13 +2,127 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Immo Suite API",
-    "description": "Contrat d'API d'Immo Suite (étape 02 : sondes, connexion, session, organisation active)",
+    "description": "Contrat d'API d'Immo Suite (étapes 02 à 04 : sondes, connexion, session, comptes, membres, invitations, paramètres, accès support, journal, événements d'usage, erreurs du front, signalements)",
     "license": {
       "name": "Propriétaire, tous droits réservés"
     },
     "version": "0.0.0"
   },
   "paths": {
+    "/api/audit": {
+      "get": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Journal d'audit, du plus récent au plus ancien. Filtres facultatifs, pagination par curseur (25 par défaut, 100 au plus).",
+        "operationId": "list_audit",
+        "parameters": [
+          {
+            "name": "actor_id",
+            "in": "query",
+            "description": "Identifiant d'utilisateur",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Code objet.verbe",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "object_type",
+            "in": "query",
+            "description": "Type d'objet",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "query",
+            "description": "Identifiant d'objet",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "AAAA-MM-JJ, fuseau de l'organisation, borne incluse",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "AAAA-MM-JJ, fuseau de l'organisation, borne incluse",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor_kind",
+            "in": "query",
+            "description": "user, system ou support",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "25 par défaut, 100 au plus",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Curseur opaque de la page suivante",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page du journal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPageBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "request.cursor_invalid"
+          },
+          "403": {
+            "description": "auth.forbidden"
+          },
+          "422": {
+            "description": "validation.failed"
+          }
+        }
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": [
@@ -86,6 +200,413 @@
         }
       }
     },
+    "/api/auth/password-reset/complete": {
+      "post": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Choisit un nouveau mot de passe avec un lien de réinitialisation. Aucune session n'est ouverte.",
+        "operationId": "password_reset_complete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetCompletePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Mot de passe changé"
+          },
+          "410": {
+            "description": "auth.reset_expired"
+          },
+          "422": {
+            "description": "auth.password_weak"
+          },
+          "429": {
+            "description": "rate_limit.exceeded"
+          }
+        }
+      }
+    },
+    "/api/auth/reauth": {
+      "post": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Confirme le mot de passe : valable 5 minutes pour les actions à enjeu de cette session.",
+        "operationId": "reauth",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReauthPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Confirmé pour 5 minutes"
+          },
+          "401": {
+            "description": "auth.invalid_credentials"
+          },
+          "429": {
+            "description": "auth.rate_limited"
+          }
+        }
+      }
+    },
+    "/api/auth/totp/verify": {
+      "post": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Second facteur : le défi de la connexion et le code ouvrent la session.",
+        "operationId": "totp_verify",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpVerifyPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Connecté",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "auth.totp_invalid ou auth.session_expired"
+          },
+          "429": {
+            "description": "auth.rate_limited"
+          }
+        }
+      }
+    },
+    "/api/client-errors": {
+      "post": {
+        "tags": [
+          "crate::api_observation"
+        ],
+        "summary": "Erreur du front (`window.onerror`, rejet non traité). Nettoyée (numéros, adresses, jetons), agrégée par empreinte ; ni pile ni\nadresse ; `204`.",
+        "operationId": "post_client_error",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientErrorPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Erreur reçue"
+          },
+          "413": {
+            "description": "request.too_large"
+          },
+          "429": {
+            "description": "rate_limit.exceeded"
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "post": {
+        "tags": [
+          "crate::api_observation"
+        ],
+        "summary": "Événements d'usage du front, par lots (20 et 8 Kio au plus). Liste blanche fermée : un événement inconnu, d'origine serveur ou\naux propriétés hors liste est écarté **et compté** ; la réponse reste `204` en production, `422` en développement et en essai.",
+        "operationId": "post_events",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventsPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Lot reçu (certains événements ont pu être écartés et comptés)"
+          },
+          "413": {
+            "description": "request.too_large"
+          },
+          "422": {
+            "description": "validation.failed : hors production, un événement a été écarté"
+          },
+          "429": {
+            "description": "rate_limit.exceeded"
+          }
+        }
+      }
+    },
+    "/api/feedback": {
+      "post": {
+        "tags": [
+          "crate::api_observation"
+        ],
+        "summary": "Signalement d'un problème. Crée la ligne, l'événement `feedback_submitted` et la tâche d'alerte dans la même transaction.\n`Idempotency-Key` (UUID) : un double clic ne crée qu'un signalement.",
+        "operationId": "post_feedback",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Signalement créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackCreatedBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation.failed"
+          },
+          "429": {
+            "description": "rate_limit.exceeded : 5 par heure et par utilisateur"
+          }
+        }
+      }
+    },
+    "/api/invitations": {
+      "get": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Invitations de l'organisation (en attente, expirées, acceptées, révoquées).",
+        "operationId": "list_invitations",
+        "responses": {
+          "200": {
+            "description": "Invitations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationsBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Crée une invitation. Le lien n'est dans aucune autre réponse : pour le retrouver, « Renvoyer ».",
+        "operationId": "create_invitation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Invitation créée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedInvitationBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth.reauth_required (rôle gérant)"
+          },
+          "409": {
+            "description": "auth.identifier_taken ou invitation.already_pending"
+          },
+          "422": {
+            "description": "validation.failed"
+          }
+        }
+      }
+    },
+    "/api/invitations/accept": {
+      "post": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Accepte une invitation. Nouveau compte : nom et mot de passe, la session est ouverte. Compte existant : connexion préalable\n(la session de ce compte porte la requête), l'adhésion est créée et la session garde son organisation active.",
+        "operationId": "accept_invitation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvitationPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Invitation acceptée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "auth.identifier_taken"
+          },
+          "410": {
+            "description": "invitation.expired"
+          },
+          "422": {
+            "description": "auth.password_weak ou validation.failed"
+          }
+        }
+      }
+    },
+    "/api/invitations/{id}/renew": {
+      "post": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Renvoie une invitation : l'ancienne est révoquée, un nouveau jeton est créé.",
+        "operationId": "renew_invitation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Identifiant de l'invitation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nouvelle invitation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedInvitationBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "resource.not_found"
+          }
+        }
+      }
+    },
+    "/api/invitations/{id}/revoke": {
+      "post": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Révoque une invitation : le lien cesse de fonctionner.",
+        "operationId": "revoke_invitation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Identifiant de l'invitation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invitation révoquée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "resource.not_found"
+          }
+        }
+      }
+    },
+    "/api/invitations/{token}": {
+      "get": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Page publique d'invitation : organisation, rôle, échéance. Expirée, révoquée ou utilisée : 410, même corps.",
+        "operationId": "invitation_preview",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Jeton de l'invitation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invitation valable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationPreviewBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "resource.not_found"
+          },
+          "410": {
+            "description": "invitation.expired"
+          }
+        }
+      }
+    },
     "/api/me": {
       "get": {
         "tags": [
@@ -106,6 +627,41 @@
           },
           "401": {
             "description": "auth.unauthenticated"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Nom affiché et, avec confirmation du mot de passe, numéro de téléphone.",
+        "operationId": "update_me",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Compte mis à jour",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth.reauth_required"
+          },
+          "409": {
+            "description": "auth.identifier_taken"
           }
         }
       }
@@ -144,6 +700,94 @@
         }
       }
     },
+    "/api/me/password": {
+      "put": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Change le mot de passe : les autres sessions sont révoquées, la session courante reçoit un nouvel identifiant.",
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Changé ; cookie renouvelé"
+          },
+          "401": {
+            "description": "auth.invalid_credentials"
+          },
+          "422": {
+            "description": "auth.password_weak"
+          }
+        }
+      }
+    },
+    "/api/me/totp": {
+      "post": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Crée le secret de la double authentification (affiché une seule fois).",
+        "operationId": "totp_begin",
+        "responses": {
+          "200": {
+            "description": "Secret en attente de confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpEnrollmentBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation.failed (déjà activée)"
+          }
+        }
+      }
+    },
+    "/api/me/totp/confirm": {
+      "post": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Active la double authentification et remet les codes de secours.",
+        "operationId": "totp_confirm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpConfirmPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Activée ; codes de secours affichés une seule fois",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupCodesBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "auth.totp_invalid"
+          }
+        }
+      }
+    },
     "/api/organization": {
       "get": {
         "tags": [
@@ -164,6 +808,475 @@
           },
           "403": {
             "description": "auth.forbidden"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Nom et ville de l'organisation (`If-Match` obligatoire).",
+        "operationId": "patch_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchOrganizationPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Organisation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDetailBody"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "concurrency.version_mismatch"
+          },
+          "428": {
+            "description": "concurrency.version_required"
+          }
+        }
+      }
+    },
+    "/api/role-settings": {
+      "get": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Les droits réglables applicables au plan de l'organisation.",
+        "operationId": "get_role_settings",
+        "responses": {
+          "200": {
+            "description": "Réglages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleSettingsBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Règle un droit (`If-Match` : la version lue, 0 pour créer). Effet à la requête suivante, sans reconnexion.",
+        "operationId": "put_role_setting",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleSettingPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Réglage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleSettingBody"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "concurrency.version_mismatch"
+          },
+          "422": {
+            "description": "validation.failed"
+          },
+          "428": {
+            "description": "concurrency.version_required"
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Paramètres de l'organisation (fuseau, devise et langue en lecture seule).",
+        "operationId": "get_settings",
+        "responses": {
+          "200": {
+            "description": "Paramètres",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Modifie les paramètres (`If-Match`). Un champ inconnu est refusé ; un montant décimal ou négatif aussi.",
+        "operationId": "patch_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchSettingsPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Paramètres",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsBody"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "concurrency.version_mismatch"
+          },
+          "422": {
+            "description": "validation.failed"
+          }
+        }
+      }
+    },
+    "/api/support-grants": {
+      "get": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Accords donnés à l'équipe HABEK et consultations qu'elle a faites.",
+        "operationId": "list_support_grants",
+        "responses": {
+          "200": {
+            "description": "Accords et consultations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportOverviewBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Autorise l'équipe HABEK pour une durée limitée (confirmation du mot de passe exigée).",
+        "operationId": "create_support_grant",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupportGrantPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Accord",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportGrantBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth.reauth_required"
+          },
+          "422": {
+            "description": "validation.failed"
+          }
+        }
+      }
+    },
+    "/api/support-grants/{id}/revoke": {
+      "post": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Retire l'accès immédiatement (confirmation du mot de passe exigée).",
+        "operationId": "revoke_support_grant",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Identifiant de l'accord",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accord révoqué",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportGrantBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "resource.not_found"
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Membres de l'organisation active.",
+        "operationId": "list_users",
+        "responses": {
+          "200": {
+            "description": "Membres",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembersBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth.forbidden"
+          }
+        }
+      }
+    },
+    "/api/users/{membership_id}": {
+      "patch": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Change le rôle d'un membre : effet à la requête suivante, aucune session révoquée.",
+        "operationId": "change_role",
+        "parameters": [
+          {
+            "name": "membership_id",
+            "in": "path",
+            "description": "Identifiant d'adhésion",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRolePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Membre",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth.reauth_required ou auth.forbidden"
+          },
+          "409": {
+            "description": "user.last_manager"
+          }
+        }
+      }
+    },
+    "/api/users/{membership_id}/disable": {
+      "post": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Désactive un membre : ses sessions sur cette organisation sont révoquées.",
+        "operationId": "disable_user",
+        "parameters": [
+          {
+            "name": "membership_id",
+            "in": "path",
+            "description": "Identifiant d'adhésion",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Membre désactivé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth.reauth_required ou auth.forbidden"
+          },
+          "409": {
+            "description": "user.last_manager"
+          }
+        }
+      }
+    },
+    "/api/users/{membership_id}/enable": {
+      "post": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Réactive un membre (confirmation du mot de passe exigée).",
+        "operationId": "enable_user",
+        "parameters": [
+          {
+            "name": "membership_id",
+            "in": "path",
+            "description": "Identifiant d'adhésion",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Membre réactivé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth.reauth_required"
+          }
+        }
+      }
+    },
+    "/api/users/{membership_id}/password-resets": {
+      "post": {
+        "tags": [
+          "crate::api_account"
+        ],
+        "summary": "Génère un lien de réinitialisation de 15 minutes pour un membre (jamais pour un gérant : support HABEK).",
+        "operationId": "issue_reset",
+        "parameters": [
+          {
+            "name": "membership_id",
+            "in": "path",
+            "description": "Identifiant d'adhésion",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lien affiché une seule fois",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetLinkBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth.reauth_required ou auth.forbidden"
+          },
+          "429": {
+            "description": "auth.rate_limited"
+          }
+        }
+      }
+    },
+    "/api/users/{membership_id}/unit-assignments": {
+      "put": {
+        "tags": [
+          "crate::api_admin"
+        ],
+        "summary": "Affecte des lots à un membre. Jusqu'à l'étape 05, seule la liste vide est acceptée (retrait des affectations).",
+        "operationId": "set_unit_assignments",
+        "parameters": [
+          {
+            "name": "membership_id",
+            "in": "path",
+            "description": "Identifiant d'adhésion",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitAssignmentsPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Affectations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitAssignmentsBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation.failed"
           }
         }
       }
@@ -219,12 +1332,502 @@
   },
   "components": {
     "schemas": {
+      "AcceptInvitationPayload": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nouveau compte seulement."
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nouveau compte seulement."
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuditActorBody": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AuditActorChoice": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditMetaBody": {
+        "type": "object",
+        "required": [
+          "actors"
+        ],
+        "properties": {
+          "actors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditActorChoice"
+            },
+            "description": "Personnes qui ont une adhésion dans l'organisation (filtre « utilisateur »)."
+          }
+        }
+      },
+      "AuditObjectBody": {
+        "type": "object",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditPageBody": {
+        "type": "object",
+        "required": [
+          "items",
+          "meta"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditRowBody"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/AuditMetaBody"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AuditRowBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "occurred_at",
+          "actor",
+          "action",
+          "object",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/AuditActorBody"
+          },
+          "after": {
+            "type": "object"
+          },
+          "before": {
+            "type": "object"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ip": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absente (jamais vide) pour les rôles qui ne voient pas l'adresse IP."
+          },
+          "object": {
+            "$ref": "#/components/schemas/AuditObjectBody"
+          },
+          "occurred_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BackupCodesBody": {
+        "type": "object",
+        "required": [
+          "backup_codes"
+        ],
+        "properties": {
+          "backup_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Dix codes de secours, affichés une seule fois, par groupes de 4 (`ABCD-EFGH-JKMN`)."
+          }
+        }
+      },
+      "ChangePasswordPayload": {
+        "type": "object",
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChangeRolePayload": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClientErrorPayload": {
+        "type": "object",
+        "required": [
+          "message",
+          "screen",
+          "client_version",
+          "request_ids"
+        ],
+        "properties": {
+          "client_version": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "description": "Message de l'erreur JavaScript (200 caractères au plus après nettoyage ; jamais le texte de l'écran)."
+          },
+          "request_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Jusqu'à 5 identifiants de requête (`INC-…`)."
+          },
+          "screen": {
+            "type": "string",
+            "description": "Écran (`S00` à `S26`)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateInvitationPayload": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Téléphone (un des deux, pas les deux)."
+          },
+          "role": {
+            "type": "string"
+          },
+          "unit_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateSupportGrantPayload": {
+        "type": "object",
+        "required": [
+          "scope",
+          "reason"
+        ],
+        "properties": {
+          "duration_hours": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "De 1 à 168 (7 jours) ; 24 par défaut."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "description": "`read` ou `import_assist`."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreatedInvitationBody": {
+        "type": "object",
+        "required": [
+          "invitation",
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string"
+          },
+          "invitation": {
+            "$ref": "#/components/schemas/InvitationBody"
+          },
+          "url": {
+            "type": "string",
+            "description": "Lien à usage unique de 7 jours, affiché une seule fois."
+          }
+        }
+      },
+      "EventsPayload": {
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Jusqu'à 20 événements `{ name, properties, client_version }` ; les suivants sont écartés et comptés."
+          }
+        },
+        "additionalProperties": false
+      },
+      "FeedbackContextPayload": {
+        "type": "object",
+        "required": [
+          "screen",
+          "path",
+          "client_version",
+          "viewport",
+          "last_request_ids"
+        ],
+        "properties": {
+          "client_version": {
+            "type": "string"
+          },
+          "last_error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_request_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "path": {
+            "type": "string",
+            "description": "Modèle d'adresse : sans paramètre de requête ni jeton (nettoyé aussi par le serveur)."
+          },
+          "screen": {
+            "type": "string"
+          },
+          "viewport": {
+            "type": "string",
+            "description": "Taille d'écran `390x844`."
+          }
+        },
+        "additionalProperties": false
+      },
+      "FeedbackCreatedBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "reference"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Référence lisible `SIG-000042`, donnée au support."
+          }
+        }
+      },
+      "FeedbackPayload": {
+        "type": "object",
+        "required": [
+          "category",
+          "description",
+          "can_call_back",
+          "context"
+        ],
+        "properties": {
+          "can_call_back": {
+            "type": "boolean"
+          },
+          "category": {
+            "type": "string",
+            "description": "`bug`, `request` ou `question`."
+          },
+          "context": {
+            "$ref": "#/components/schemas/FeedbackContextPayload"
+          },
+          "description": {
+            "type": "string",
+            "description": "Texte libre de 5 à 4 000 caractères : stocké tel quel, jamais journalisé."
+          }
+        },
+        "additionalProperties": false
+      },
+      "InvitationBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "identifier",
+          "role",
+          "status",
+          "created_at",
+          "expires_at",
+          "invited_by"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "invited_by": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending`, `expired`, `accepted` ou `revoked`."
+          }
+        }
+      },
+      "InvitationPreviewBody": {
+        "type": "object",
+        "required": [
+          "organization_name",
+          "role",
+          "expires_at",
+          "identifier_exists"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string"
+          },
+          "identifier_exists": {
+            "type": "boolean"
+          },
+          "organization_name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "InvitationsBody": {
+        "type": "object",
+        "required": [
+          "invitations"
+        ],
+        "properties": {
+          "invitations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvitationBody"
+            }
+          }
+        }
+      },
       "LoginBody": {
         "type": "object",
         "required": [
-          "user",
           "organizations",
-          "csrf_token",
           "mfa_required"
         ],
         "properties": {
@@ -235,12 +1838,23 @@
             ],
             "description": "Absente tant que l'utilisateur de plusieurs organisations n'en a pas choisi une."
           },
+          "challenge": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Défi signé valable 5 minutes (F01 §9.5), présent seulement si `mfa_required`."
+          },
           "csrf_token": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absent quand un second facteur est exigé."
           },
           "mfa_required": {
             "type": "boolean",
-            "description": "Toujours faux à l'étape 02 (double authentification : étape 03)."
+            "description": "Vrai si le compte a une double authentification : le défi se présente à `POST /auth/totp/verify` avec le code."
           },
           "organizations": {
             "type": "array",
@@ -249,7 +1863,15 @@
             }
           },
           "user": {
-            "$ref": "#/components/schemas/UserBody"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UserBody",
+                "description": "Absent quand un second facteur est exigé : aucune session n'est ouverte avant le code."
+              }
+            ]
           }
         }
       },
@@ -341,6 +1963,56 @@
           }
         }
       },
+      "MemberBody": {
+        "type": "object",
+        "required": [
+          "membership_id",
+          "user_id",
+          "display_name",
+          "identifier",
+          "role",
+          "status",
+          "is_self"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "is_self": {
+            "type": "boolean"
+          },
+          "membership_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "`active` ou `disabled`."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "MembersBody": {
+        "type": "object",
+        "required": [
+          "users"
+        ],
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberBody"
+            }
+          }
+        }
+      },
       "MembershipBody": {
         "type": "object",
         "required": [
@@ -424,7 +2096,8 @@
           "name",
           "plan",
           "kind",
-          "lifecycle"
+          "lifecycle",
+          "version"
         ],
         "properties": {
           "city": {
@@ -444,6 +2117,181 @@
           },
           "plan": {
             "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Version pour `If-Match` (`PATCH /organization`)."
+          }
+        }
+      },
+      "PatchOrganizationPayload": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Vide : efface la ville."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PatchSettingsPayload": {
+        "type": "object",
+        "required": [
+          "legal_ids",
+          "share_link_ttl_days",
+          "payment_confirm_threshold"
+        ],
+        "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_paper": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_ids": {
+            "type": "object"
+          },
+          "payment_confirm_threshold": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Entier FCFA de 1 à 999 999 999 ; un décimal ou un négatif est refusé."
+          },
+          "receipt_header": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receipt_prefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "share_link_ttl_days": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReauthPayload": {
+        "type": "object",
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResetCompletePayload": {
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "properties": {
+          "new_password": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResetLinkBody": {
+        "type": "object",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "Lien à usage unique de 15 minutes, affiché une seule fois."
+          }
+        }
+      },
+      "RoleSettingBody": {
+        "type": "object",
+        "required": [
+          "role",
+          "action",
+          "allowed",
+          "version"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "`record_payment`, `import_data` ou `export_data`."
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "role": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Valeur d'`If-Match` pour la prochaine écriture (0 : aucune ligne)."
+          }
+        }
+      },
+      "RoleSettingPayload": {
+        "type": "object",
+        "required": [
+          "role",
+          "action",
+          "allowed"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "role": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RoleSettingsBody": {
+        "type": "object",
+        "required": [
+          "settings"
+        ],
+        "properties": {
+          "settings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleSettingBody"
+            }
           }
         }
       },
@@ -459,6 +2307,65 @@
         },
         "additionalProperties": false
       },
+      "SettingsBody": {
+        "type": "object",
+        "required": [
+          "receipt_prefix",
+          "legal_ids",
+          "default_paper",
+          "share_link_ttl_days",
+          "payment_confirm_threshold",
+          "version",
+          "timezone",
+          "currency",
+          "locale"
+        ],
+        "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "default_paper": {
+            "type": "string"
+          },
+          "legal_ids": {
+            "type": "object"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "payment_confirm_threshold": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Entier FCFA."
+          },
+          "receipt_header": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receipt_prefix": {
+            "type": "string"
+          },
+          "share_link_ttl_days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "StatusBody": {
         "type": "object",
         "description": "Réponse de `/health`.",
@@ -471,6 +2378,197 @@
             "description": "Toujours `ok` ; aucune donnée."
           }
         }
+      },
+      "SupportAccessBody": {
+        "type": "object",
+        "required": [
+          "occurred_at",
+          "action",
+          "object_type",
+          "object_id",
+          "actor_label"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor_label": {
+            "type": "string"
+          },
+          "object_id": {
+            "type": "string"
+          },
+          "object_type": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string"
+          }
+        }
+      },
+      "SupportGrantBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "scope",
+          "reason",
+          "granted_by",
+          "granted_at",
+          "expires_at",
+          "status",
+          "duration_hours"
+        ],
+        "properties": {
+          "duration_hours": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "granted_at": {
+            "type": "string"
+          },
+          "granted_by": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "description": "`read` ou `import_assist`."
+          },
+          "status": {
+            "type": "string",
+            "description": "`active`, `expired` ou `revoked` (dérivé)."
+          }
+        }
+      },
+      "SupportOverviewBody": {
+        "type": "object",
+        "required": [
+          "grants",
+          "accesses"
+        ],
+        "properties": {
+          "accesses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupportAccessBody"
+            }
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupportGrantBody"
+            }
+          }
+        }
+      },
+      "TotpConfirmPayload": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TotpEnrollmentBody": {
+        "type": "object",
+        "required": [
+          "secret_base32",
+          "otpauth_url"
+        ],
+        "properties": {
+          "otpauth_url": {
+            "type": "string"
+          },
+          "secret_base32": {
+            "type": "string",
+            "description": "Clé en base32, affichée une seule fois."
+          }
+        }
+      },
+      "TotpVerifyPayload": {
+        "type": "object",
+        "required": [
+          "challenge",
+          "code"
+        ],
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "description": "Défi reçu de `POST /auth/login`."
+          },
+          "code": {
+            "type": "string",
+            "description": "Code à 6 chiffres, ou code de secours (12 caractères, tirets facultatifs)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "UnitAssignmentsBody": {
+        "type": "object",
+        "required": [
+          "unit_ids"
+        ],
+        "properties": {
+          "unit_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UnitAssignmentsPayload": {
+        "type": "object",
+        "required": [
+          "unit_ids"
+        ],
+        "properties": {
+          "unit_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Vide jusqu'à l'étape 05 (les lots n'existent pas encore)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateMePayload": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "login_phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Changer le numéro exige la confirmation du mot de passe."
+          }
+        },
+        "additionalProperties": false
       },
       "UserBody": {
         "type": "object",

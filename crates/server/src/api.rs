@@ -31,6 +31,8 @@ use crate::problem::ApiError;
 pub enum Access {
     /// Sans session (liste fermée de `API_CONTRACTS.md` §4.1).
     Public,
+    /// Sans session, mais protégée par un jeton à usage unique ou un défi signé (invitation, réinitialisation, second facteur).
+    Token,
     /// Session valide ; une écriture exige en plus `Origin` et `X-CSRF-Token`.
     Session,
     /// Session valide et l'action de la matrice (F02).
@@ -44,7 +46,8 @@ pub struct RouteSpec {
     pub access: Access,
 }
 
-/// Registre des routes d'identité. `/health` et `/ready` (sondes) sont déclarées dans `http.rs`.
+/// Registre des routes d'identité. `/health` et `/ready` (sondes) sont déclarées dans `http.rs`. Toute route y déclare l'accès
+/// qu'elle exige : aucune ne peut exister sans déclaration (F02 §7.5). Les gestionnaires sont dans `api_account` et `api_admin`.
 pub const ROUTES: &[RouteSpec] = &[
     RouteSpec {
         method: "POST",
@@ -62,7 +65,27 @@ pub const ROUTES: &[RouteSpec] = &[
         access: Access::Session,
     },
     RouteSpec {
+        method: "POST",
+        path: "/api/auth/totp/verify",
+        access: Access::Token,
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/auth/reauth",
+        access: Access::Session,
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/auth/password-reset/complete",
+        access: Access::Token,
+    },
+    RouteSpec {
         method: "GET",
+        path: "/api/me",
+        access: Access::Session,
+    },
+    RouteSpec {
+        method: "PATCH",
         path: "/api/me",
         access: Access::Session,
     },
@@ -72,20 +95,159 @@ pub const ROUTES: &[RouteSpec] = &[
         access: Access::Session,
     },
     RouteSpec {
+        method: "PUT",
+        path: "/api/me/password",
+        access: Access::Session,
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/me/totp",
+        access: Access::Session,
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/me/totp/confirm",
+        access: Access::Session,
+    },
+    RouteSpec {
         method: "GET",
         path: "/api/organization",
         access: Access::Action(Action::SettingsRead),
     },
+    RouteSpec {
+        method: "PATCH",
+        path: "/api/organization",
+        access: Access::Action(Action::SettingsWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/settings",
+        access: Access::Action(Action::SettingsRead),
+    },
+    RouteSpec {
+        method: "PATCH",
+        path: "/api/settings",
+        access: Access::Action(Action::SettingsWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/users",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "PATCH",
+        path: "/api/users/{membership_id}",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/users/{membership_id}/disable",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/users/{membership_id}/enable",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "PUT",
+        path: "/api/users/{membership_id}/unit-assignments",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/users/{membership_id}/password-resets",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/invitations",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/invitations",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/invitations/accept",
+        access: Access::Token,
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/invitations/{token}",
+        access: Access::Token,
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/invitations/{id}/revoke",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/invitations/{id}/renew",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/role-settings",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "PUT",
+        path: "/api/role-settings",
+        access: Access::Action(Action::UserManage),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/support-grants",
+        access: Access::Action(Action::SupportGrant),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/support-grants",
+        access: Access::Action(Action::SupportGrant),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/support-grants/{id}/revoke",
+        access: Access::Action(Action::SupportGrant),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/audit",
+        access: Access::Action(Action::AuditRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/events",
+        access: Access::Action(Action::EventsCreate),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/client-errors",
+        access: Access::Action(Action::EventsCreate),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/feedback",
+        access: Access::Action(Action::FeedbackCreate),
+    },
 ];
-
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/api/auth/login", post(login))
         .route("/api/auth/logout", post(logout))
         .route("/api/auth/logout-all", post(logout_all))
-        .route("/api/me", get(me))
+        .route("/api/me", get(me).patch(crate::api_account::update_me))
         .route("/api/me/organization", post(select_organization))
-        .route("/api/organization", get(organization))
+        .route(
+            "/api/organization",
+            get(organization).patch(crate::api_admin::patch_organization),
+        )
+        .merge(crate::api_account::routes())
+        .merge(crate::api_admin::routes())
 }
 
 // ───────── corps et réponses ─────────
@@ -122,13 +284,17 @@ pub struct OrganizationChoiceBody {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LoginBody {
-    pub user: UserBody,
+    /// Absent quand un second facteur est exigé : aucune session n'est ouverte avant le code.
+    pub user: Option<UserBody>,
     pub organizations: Vec<OrganizationChoiceBody>,
     /// Absente tant que l'utilisateur de plusieurs organisations n'en a pas choisi une.
     pub active_organization_id: Option<String>,
-    pub csrf_token: String,
-    /// Toujours faux à l'étape 02 (double authentification : étape 03).
+    /// Absent quand un second facteur est exigé.
+    pub csrf_token: Option<String>,
+    /// Vrai si le compte a une double authentification : le défi se présente à `POST /auth/totp/verify` avec le code.
     pub mfa_required: bool,
+    /// Défi signé valable 5 minutes (F01 §9.5), présent seulement si `mfa_required`.
+    pub challenge: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -173,6 +339,8 @@ pub struct OrganizationDetailBody {
     pub plan: String,
     pub kind: String,
     pub lifecycle: String,
+    /// Version pour `If-Match` (`PATCH /organization`).
+    pub version: i32,
 }
 
 fn choice_body(c: &OrgChoice) -> OrganizationChoiceBody {
@@ -186,16 +354,28 @@ fn choice_body(c: &OrgChoice) -> OrganizationChoiceBody {
     }
 }
 
-fn login_body(g: &SessionGrant) -> LoginBody {
+pub(crate) fn login_body(g: &SessionGrant) -> LoginBody {
     LoginBody {
-        user: UserBody {
+        user: Some(UserBody {
             id: g.user.id.to_string(),
             display_name: g.user.display_name.clone(),
-        },
+        }),
         organizations: g.organizations.iter().map(choice_body).collect(),
         active_organization_id: g.active_org.map(|o| o.to_string()),
-        csrf_token: g.csrf_token.clone(),
+        csrf_token: Some(g.csrf_token.clone()),
         mfa_required: false,
+        challenge: None,
+    }
+}
+
+fn mfa_body(challenge: String) -> LoginBody {
+    LoginBody {
+        user: None,
+        organizations: vec![],
+        active_organization_id: None,
+        csrf_token: None,
+        mfa_required: true,
+        challenge: Some(challenge),
     }
 }
 
@@ -248,6 +428,7 @@ pub async fn login(
             Err(ctx.err(ApiError::rate_limited(retry_after_seconds)))
         }
         Err(LoginError::NoActiveMembership) => Err(ctx.err(ApiError::no_active_membership())),
+        Err(LoginError::MfaRequired { challenge }) => Ok(Json(mfa_body(challenge)).into_response()),
         Err(LoginError::Internal) => Err(ctx.unexpected()),
     }
 }
@@ -306,13 +487,13 @@ async fn me_body(state: &AppState, token: &str, auth: &Authenticated, ctx: &Ctx)
     let now = svc.clock().now();
     let (membership, organization, permissions) = match (&auth.org, auth.role) {
         (Some(org), Some(role)) => {
+            // un droit réglable est compté si son réglage est à « oui » à cette requête (F02 §7.1 point 5)
             let permissions = Action::ALL
                 .iter()
-                .filter(|a| {
-                    authorize(role, org.plan, **a)
-                        != Decision::Deny(immo_app::identity::authorize::DenyReason::Forbidden)
+                .filter(|a| match authorize(role, org.plan, **a) {
+                    Decision::NeedsSetting(key) => auth.granted_settings.iter().any(|s| s == key),
+                    d => d.is_allowed_without_settings(),
                 })
-                .filter(|a| authorize(role, org.plan, **a).is_allowed_without_settings())
                 .map(|a| a.code().to_string())
                 .collect();
             (
@@ -333,6 +514,18 @@ async fn me_body(state: &AppState, token: &str, auth: &Authenticated, ctx: &Ctx)
         }
         _ => (None, None, vec![]),
     };
+    // les vrais réglages (F01 §9.8) ; une session sans organisation active n'en a pas
+    let settings = match &auth.org {
+        Some(_) => {
+            let s = svc.org_settings(auth).await.map_err(|e| ctx.service(e))?;
+            json!({
+                "payment_confirm_threshold": s.payment_confirm_threshold,
+                "default_paper": s.default_paper,
+                "share_link_ttl_days": s.share_link_ttl_days,
+            })
+        }
+        None => json!({}),
+    };
     Ok(MeBody {
         user: UserBody {
             id: auth.user.id.to_string(),
@@ -347,7 +540,7 @@ async fn me_body(state: &AppState, token: &str, auth: &Authenticated, ctx: &Ctx)
         server_time: now.to_rfc3339(),
         csrf_token: svc.csrf_for(token),
         min_client_version: state.min_client_version.clone(),
-        settings: json!({}),
+        settings,
     })
 }
 
@@ -408,15 +601,20 @@ pub async fn organization(
 ) -> Result<Json<OrganizationDetailBody>, ApiError> {
     session.require(Action::SettingsRead)?;
     let svc = identity(&state, &session.ctx)?;
-    let summary = svc
-        .organization_summary(&session.auth)
+    let detail = svc
+        .organization_detail(&session.auth)
         .await
-        .map_err(|_| session.ctx.unexpected())?;
-    Ok(Json(OrganizationDetailBody {
-        name: summary.name,
-        city: summary.city,
-        plan: summary.plan.as_str().to_string(),
-        kind: summary.kind,
-        lifecycle: summary.lifecycle,
-    }))
+        .map_err(|e| session.ctx.service(e))?;
+    Ok(Json(org_body(detail)))
+}
+
+pub(crate) fn org_body(d: immo_app::identity::settings::OrgDetail) -> OrganizationDetailBody {
+    OrganizationDetailBody {
+        name: d.name,
+        city: d.city,
+        plan: d.plan.as_str().to_string(),
+        kind: d.kind,
+        lifecycle: d.lifecycle,
+        version: d.version,
+    }
 }

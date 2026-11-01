@@ -22,7 +22,7 @@ use immo_app::identity::service::IdentityService;
 use immo_app::platform::db::Db;
 use immo_db_tests::{TestClock, TestDb};
 use immo_server::http::{AppState, router};
-use serde_json::Value;
+use serde_json::{Value, json};
 use sqlx::Executor;
 
 pub const ORG_A: &str = "a0000000-0000-4000-8000-00000000000a";
@@ -43,6 +43,12 @@ pub struct Api {
 /// « Trois » (+22670000013) sans accès ; « Quatre » (+22670000014) collaborateur de C (plan Propriétaire) ;
 /// « Cinq » (un.gerant@agence.bf) gérant de B ; « Six » (+22670000016) comptable de A.
 pub async fn api(params: HashParams, min_client_version: &str) -> Api {
+    api_with(params, min_client_version, false, false).await
+}
+
+/// Comme `api`, avec les réglages d'observation : `strict` (événement écarté = 422, hors production) et `test_routes`
+/// (route d'essai qui provoque une erreur 500).
+pub async fn api_with(params: HashParams, min_client_version: &str, strict: bool, test_routes: bool) -> Api {
     let db = TestDb::create().await;
     let passwords = PasswordService::new(params).unwrap();
     let hash = passwords.hash(GOOD).await.unwrap();
@@ -69,13 +75,19 @@ pub async fn api(params: HashParams, min_client_version: &str) -> Api {
         .unwrap();
     let app_db = Db::connect(&db.app_url, 6).await.unwrap();
     let clock = Arc::new(TestClock::new());
-    let svc = IdentityService::new(app_db, passwords, clock.clone(), SECRET.to_vec());
-    let state = AppState::new(vec![], "test".to_string()).with_identity(
-        svc.clone(),
-        vec![ORIGIN.to_string()],
-        false,
-        min_client_version.to_string(),
-    );
+    let svc = IdentityService::new(app_db, passwords, clock.clone(), SECRET.to_vec()).with_field_key(Some(
+        immo_app::identity::crypto::FieldKey::from_bytes(&[9_u8; 32]).unwrap(),
+    ));
+    let state = AppState::new(vec![], "test".to_string())
+        .with_identity(
+            svc.clone(),
+            vec![ORIGIN.to_string()],
+            false,
+            min_client_version.to_string(),
+        )
+        .with_public_base_url("https://app.test")
+        .with_strict_events(strict)
+        .with_test_routes(test_routes);
     Api {
         db,
         app: router(Arc::new(state)),
@@ -171,4 +183,64 @@ pub async fn login(app: &Router, identifier: &str, password: &str, ip: &str) -> 
 
 pub fn get_with(cookie: &str) -> Vec<(&str, &str)> {
     vec![("cookie", cookie)]
+}
+
+// ───────── session de test et outils de l'étape 03 ─────────
+
+pub const IP: &str = "10.30.0.1";
+
+pub struct S {
+    pub cookie: String,
+    pub csrf: String,
+}
+
+pub async fn sess(a: &Api, identifier: &str) -> S {
+    let (cookie, csrf) = login(&a.app, identifier, GOOD, IP).await;
+    S { cookie, csrf }
+}
+
+pub async fn req(a: &Api, s: &S, method: Method, path: &str, body: Option<Value>, extra: &[(&str, &str)]) -> Reply {
+    let mut headers: Vec<(&str, &str)> = vec![
+        ("cookie", &s.cookie),
+        ("x-csrf-token", &s.csrf),
+        ("origin", ORIGIN),
+        ("content-type", "application/json"),
+    ];
+    headers.extend_from_slice(extra);
+    let text = body.map(|b| b.to_string());
+    call(&a.app, method, path, IP, &headers, text.as_deref()).await
+}
+
+pub async fn reauth(a: &Api, s: &S) {
+    let r = req(
+        a,
+        s,
+        Method::POST,
+        "/api/auth/reauth",
+        Some(json!({ "password": GOOD })),
+        &[],
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::NO_CONTENT, "{}", r.body);
+}
+
+pub async fn actions(a: &Api, org: &str) -> Vec<String> {
+    sqlx::query_scalar::<_, String>(sqlx::AssertSqlSafe(format!(
+        "SELECT action FROM audit_log WHERE org_id = '{org}' ORDER BY id"
+    )))
+    .fetch_all(&a.db.admin)
+    .await
+    .unwrap()
+}
+
+pub async fn count(a: &Api, sql: &str) -> i64 {
+    sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(sql.to_string()))
+        .fetch_one(&a.db.admin)
+        .await
+        .unwrap()
+}
+
+/// Jeton d'un lien « https://app.test/invitation/<jeton> ».
+pub fn token_of(url: &str) -> String {
+    url.rsplit('/').next().unwrap().to_string()
 }

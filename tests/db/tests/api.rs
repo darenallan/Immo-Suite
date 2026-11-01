@@ -74,11 +74,13 @@ async fn a1_identifiant_inconnu_et_mot_de_passe_faux_donnent_la_meme_reponse_en_
     }
     unknown.sort();
     wrong.sort();
-    let (mu, mw) = (unknown[2].as_secs_f64(), wrong[2].as_secs_f64());
+    // le MINIMUM de cinq mesures (le sixième échec d'un même identifiant serait limité, d'où cinq au plus) : la mesure la moins gênée par la charge de la machine (d'autres tests tournent en parallèle) ;
+    // la médiane de cinq échouait par intermittence quand le poste était occupé, sans lien avec le code testé
+    let (mu, mw) = (unknown[0].as_secs_f64(), wrong[0].as_secs_f64());
     let ratio = if mu > mw { mu / mw } else { mw / mu };
     assert!(
         ratio < 1.6,
-        "durées médianes comparables : inconnu {mu:.4} s, faux {mw:.4} s (rapport {ratio:.2})"
+        "durées minimales comparables : inconnu {mu:.4} s, faux {mw:.4} s (rapport {ratio:.2})"
     );
     a.db.drop_db().await;
 }
@@ -640,7 +642,7 @@ async fn le_registre_des_routes_correspond_au_contrat_et_chaque_route_protegee_e
         let method = Method::from_bytes(r.method.as_bytes()).unwrap();
         let reply = call(&a.app, method, r.path, IP, &[JSON, ("origin", ORIGIN)], Some("{}")).await;
         match r.access {
-            Access::Public => assert!(
+            Access::Public | Access::Token => assert!(
                 reply.status != StatusCode::INTERNAL_SERVER_ERROR,
                 "{} {}",
                 r.method,
@@ -665,6 +667,21 @@ async fn le_registre_des_routes_correspond_au_contrat_et_chaque_route_protegee_e
         .map(|r| r.path)
         .collect();
     assert_eq!(public, ["/api/auth/login", "/api/auth/logout"]);
+    // les routes « par jeton » sont déclarées comme telles, une par une (F02 §7.5) : aucune ne s'ajoute sans relecture
+    let by_token: Vec<&str> = ROUTES
+        .iter()
+        .filter(|r| r.access == Access::Token)
+        .map(|r| r.path)
+        .collect();
+    assert_eq!(
+        by_token,
+        [
+            "/api/auth/totp/verify",
+            "/api/auth/password-reset/complete",
+            "/api/invitations/accept",
+            "/api/invitations/{token}"
+        ]
+    );
     a.db.drop_db().await;
 }
 

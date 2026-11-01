@@ -51,6 +51,11 @@ impl Ctx {
     pub fn unexpected(&self) -> ApiError {
         ApiError::unexpected(&self.request_id)
     }
+
+    /// Erreur du service d'identité, traduite au format du contrat avec le code d'incident de cette requête.
+    pub fn service(&self, e: immo_app::identity::error::ServiceError) -> ApiError {
+        ApiError::from_service(e, &self.request_id)
+    }
 }
 
 impl FromRequestParts<Arc<AppState>> for Ctx {
@@ -102,7 +107,8 @@ pub struct Session {
 
 impl Session {
     /// Applique `authorize` : refus par défaut, `403 auth.forbidden` ou `403 plan.feature_unavailable`. Un droit réglable est
-    /// refusé tant que `role_settings` n'existe pas (étape 03). Sans organisation active : `403 auth.organization_required`.
+    /// accordé si son réglage est à « oui » (`role_settings`, lu à chaque requête). Sans organisation active :
+    /// `403 auth.organization_required`.
     pub fn require(&self, action: Action) -> Result<Decision, ApiError> {
         let (Some(org), Some(role)) = (&self.auth.org, self.auth.role) else {
             return Err(self.ctx.err(ApiError::organization_required()));
@@ -113,6 +119,12 @@ impl Session {
         let decision = authorize(role, org.plan, action);
         if decision.is_allowed_without_settings() {
             return Ok(decision);
+        }
+        // droit réglable : accordé si le réglage est à « oui », lu à CETTE requête (F02 §7.1 points 4 et 6)
+        if let Decision::NeedsSetting(key) = decision
+            && self.auth.granted_settings.iter().any(|s| s == key)
+        {
+            return Ok(Decision::Allow);
         }
         Err(self.ctx.err(match decision {
             Decision::Deny(DenyReason::PlanUnavailable) => ApiError::plan_unavailable(),

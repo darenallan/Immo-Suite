@@ -40,6 +40,12 @@ pub struct AppState {
     pub trust_proxy: bool,
     pub min_client_version: String,
     pub limiter: RateLimiter,
+    /// Adresse publique de l'application, sans barre finale : base des liens d'invitation et de réinitialisation.
+    pub public_base_url: String,
+    /// Hors production : un événement d'usage écarté répond `422` au lieu de `204` (F39-observation règle 4).
+    pub strict_events: bool,
+    /// Route d'essai `GET /api/_test/server-error` (jamais en production, F39-observation §4).
+    pub enable_test_routes: bool,
 }
 
 impl AppState {
@@ -53,7 +59,28 @@ impl AppState {
             trust_proxy: false,
             min_client_version: "0.0.0".to_string(),
             limiter: RateLimiter::new(),
+            public_base_url: "http://localhost:8080".to_string(),
+            strict_events: false,
+            enable_test_routes: false,
         }
+    }
+
+    /// Événements écartés : `422` (développement et essai) au lieu de `204` (production).
+    pub fn with_strict_events(mut self, strict: bool) -> Self {
+        self.strict_events = strict;
+        self
+    }
+
+    /// Monte la route d'essai qui provoque une erreur 500 réelle.
+    pub fn with_test_routes(mut self, enabled: bool) -> Self {
+        self.enable_test_routes = enabled;
+        self
+    }
+
+    /// Adresse publique (`PUBLIC_BASE_URL`) : sert à composer les liens remis au gérant.
+    pub fn with_public_base_url(mut self, url: &str) -> Self {
+        self.public_base_url = url.trim_end_matches('/').to_string();
+        self
     }
 
     pub fn with_identity(
@@ -77,6 +104,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/health", get(health))
         .route("/ready", get(ready))
         .merge(crate::api::routes())
+        .merge(crate::api_observation::routes(state.enable_test_routes))
         .fallback(not_found)
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(middleware::from_fn_with_state(state.clone(), guard))
@@ -222,6 +250,7 @@ async fn access_log(State(state): State<Arc<AppState>>, mut request: Request, ne
     let request_id = new_request_id();
     request.extensions_mut().insert(RequestId(request_id.clone()));
     let method = request.method().to_string();
+    let session = session_token(request.headers());
     // modèle de route, jamais le chemin brut : un chemin peut contenir un identifiant ou un jeton
     let route = request
         .extensions()
@@ -239,8 +268,98 @@ async fn access_log(State(state): State<Arc<AppState>>, mut request: Request, ne
         headers.insert(HeaderName::from_static(name), HeaderValue::from_static(value));
     }
     let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+    if let Some(observed) = Observed::of(&response, duration_ms) {
+        observe_response(&state, session, &route, &method, &request_id, observed).await;
+    }
     tracing::info!(request_id = %request_id, method = %method, route = %route, status = response.status().as_u16(), duration_ms, version = %state.version, "requête");
     response
+}
+
+/// Réponse lente en millisecondes (F39-observation, seuil proposé).
+const SLOW_RESPONSE_MS: u64 = 2000;
+/// Au plus 2 s d'attente pour écrire l'observation d'une réponse : jamais plus (règle 11).
+const OBSERVE_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Ce que la réponse apprend à l'observation : copié avant tout `await` (le corps d'une réponse n'est pas `Sync`).
+struct Observed {
+    status: u16,
+    server_error: Option<crate::problem::ServerErrorInfo>,
+    denied: Option<crate::problem::DeniedInfo>,
+    duration_ms: u64,
+}
+
+impl Observed {
+    fn of(response: &Response, duration_ms: u64) -> Option<Self> {
+        let server_error = response.extensions().get::<crate::problem::ServerErrorInfo>().cloned();
+        let denied = response.extensions().get::<crate::problem::DeniedInfo>().cloned();
+        if server_error.is_none() && denied.is_none() && duration_ms < SLOW_RESPONSE_MS {
+            return None;
+        }
+        Some(Self {
+            status: response.status().as_u16(),
+            server_error,
+            denied,
+            duration_ms,
+        })
+    }
+}
+
+/// Observation après la réponse (F39-observation §2 règles 11 à 13) : erreur inattendue agrégée par empreinte, refus de droit,
+/// réponse lente. Ne coûte rien à une réponse ordinaire. Un échec est journalisé et ne change jamais la réponse.
+async fn observe_response(
+    state: &AppState,
+    token: Option<String>,
+    route: &str,
+    method: &str,
+    request_id: &str,
+    observed: Observed,
+) {
+    use immo_app::observation::{errors, events::ProductEvent};
+    let report = observed
+        .server_error
+        .as_ref()
+        .map(|info| errors::server_error(route, method, observed.status, request_id, &state.version, &info.frames));
+    let session = match (&token, state.identity.as_ref()) {
+        (Some(token), Some(identity)) => identity
+            .authenticate(token)
+            .await
+            .ok()
+            .map(|auth| (token, identity, auth)),
+        _ => None,
+    };
+    let Some((token, identity, auth)) = session else {
+        // sans organisation identifiable : journal seulement, avec l'empreinte et l'identifiant de requête (règle 12)
+        if let Some(report) = report {
+            tracing::error!(request_id = %request_id, route = %route, fingerprint = %report.fingerprint, "erreur inattendue sans organisation");
+        }
+        return;
+    };
+    let work = async {
+        if let Some(report) = &report {
+            identity.record_error(&auth, report).await;
+        }
+        if let (Some(info), Some(role)) = (&observed.denied, auth.role) {
+            identity
+                .observe(
+                    &auth,
+                    token,
+                    ProductEvent::permission_denied(&info.action, role.as_str()),
+                )
+                .await;
+        }
+        if observed.duration_ms >= SLOW_RESPONSE_MS {
+            identity
+                .observe(
+                    &auth,
+                    token,
+                    ProductEvent::slow_response(route, method, observed.status, observed.duration_ms),
+                )
+                .await;
+        }
+    };
+    if tokio::time::timeout(OBSERVE_TIMEOUT, work).await.is_err() {
+        tracing::error!(request_id = %request_id, "observation : délai dépassé");
+    }
 }
 
 #[cfg(test)]

@@ -77,9 +77,14 @@ audit_actions! {
     AuthResetIssued => "auth.reset_issued",
     AuthResetUsed => "auth.reset_used",
     UserInvited => "user.invited",
+    InvitationRenewed => "invitation.renewed",
+    InvitationRevoked => "invitation.revoked",
     MembershipAccepted => "membership.accepted",
     MembershipRoleChanged => "membership.role_changed",
     UserDisabled => "user.disabled",
+    UserEnabled => "user.enabled",
+    UserUpdated => "user.updated",
+    AuthMfaBackupUsed => "auth.mfa_backup_used",
     SessionRevokedAll => "session.revoked_all",
     // Données
     ExportCreated => "export.created",
@@ -177,6 +182,18 @@ pub struct AuditContext {
     pub request_id: Option<String>,
 }
 
+/// Valeur avant ou après, en texte JSON, plafonnée à 4 Kio : au-delà, la marque `{"truncated": true}` remplace la valeur (F03 §8.5).
+/// L'écriture d'une ligne d'audit n'échoue jamais pour cette raison.
+fn capped(value: Value) -> String {
+    const MAX_BYTES: usize = 4096;
+    let text = value.to_string();
+    if text.len() > MAX_BYTES {
+        serde_json::json!({ "truncated": true }).to_string()
+    } else {
+        text
+    }
+}
+
 /// Écrit une ligne dans la transaction de l'action. Toute erreur doit entraîner l'annulation de la transaction (R-008).
 pub async fn record(tx: &mut OrgTx, ctx: &AuditContext, entry: AuditEntry) -> Result<(), DbError> {
     let kind = if ctx.actor_user_id.is_some() { "user" } else { "system" };
@@ -189,8 +206,8 @@ pub async fn record(tx: &mut OrgTx, ctx: &AuditContext, entry: AuditEntry) -> Re
     .bind(entry.action.code())
     .bind(entry.object_type)
     .bind(entry.object_id)
-    .bind(entry.before.map(|v| v.to_string()))
-    .bind(entry.after.map(|v| v.to_string()))
+    .bind(entry.before.map(capped))
+    .bind(entry.after.map(capped))
     .bind(ctx.ip.map(|i| i.to_string()))
     .bind(ctx.request_id.as_deref())
     .execute(tx.conn())
@@ -216,7 +233,7 @@ mod tests {
                 "{code}"
             );
         }
-        assert_eq!(AuditAction::ALL.len(), 57);
+        assert_eq!(AuditAction::ALL.len(), 62);
     }
 
     #[test]

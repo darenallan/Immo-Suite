@@ -87,6 +87,17 @@ async fn env() -> Env {
     Env { db, svc, clock, hash }
 }
 
+/// Un second gérant dans l'organisation A : la garde du dernier gérant (G-16) laisse alors retirer le premier.
+async fn add_second_manager(db: &TestDb) {
+    db.admin
+        .execute(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO users (id, login_phone, display_name) VALUES ('77777777-0000-4000-8000-000000000017', '+22670000017', 'Sept');
+             INSERT INTO memberships (org_id, user_id, role) VALUES ('{ORG_A}', '77777777-0000-4000-8000-000000000017', 'manager');"
+        )))
+        .await
+        .unwrap();
+}
+
 async fn count(pool: &PgPool, sql: &str) -> i64 {
     sqlx::query_scalar(sqlx::AssertSqlSafe(sql.to_string()))
         .fetch_one(pool)
@@ -200,7 +211,8 @@ async fn aucune_adhesion_active_pas_de_session() {
         .unwrap_err();
     assert!(matches!(err, LoginError::NoActiveMembership), "{err:?}");
     assert_eq!(count(&e.db.admin, "SELECT count(*) FROM sessions").await, 0);
-    // adhésion désactivée : idem
+    // adhésion désactivée : idem (un second gérant existe : la garde du dernier gérant, étape 03, ne refuse pas)
+    add_second_manager(&e.db).await;
     e.db.admin
         .execute("UPDATE memberships SET status = 'disabled', disabled_at = now() WHERE user_id = '11111111-0000-4000-8000-000000000011'")
         .await
@@ -476,7 +488,8 @@ async fn le_role_est_relu_a_chaque_requete_et_une_adhesion_retiree_coupe_la_sess
     let a = e.svc.authenticate(&ok.session_token).await.unwrap();
     assert_eq!(a.role, Some(Role::Manager));
     assert_eq!(a.user.display_name, "Un");
-    // changement de rôle en base : effectif à la requête suivante, sans reconnexion
+    // changement de rôle en base : effectif à la requête suivante, sans reconnexion (un second gérant existe : G-16)
+    add_second_manager(&e.db).await;
     e.db.admin
         .execute("UPDATE memberships SET role = 'cashier' WHERE user_id = '11111111-0000-4000-8000-000000000011'")
         .await
