@@ -2,13 +2,172 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Immo Suite API",
-    "description": "Contrat d'API d'Immo Suite (étape 01 : /health et /ready seulement)",
+    "description": "Contrat d'API d'Immo Suite (étape 02 : sondes, connexion, session, organisation active)",
     "license": {
       "name": "Propriétaire, tous droits réservés"
     },
     "version": "0.0.0"
   },
   "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "crate::api"
+        ],
+        "summary": "Connexion. Réponse identique que l'identifiant existe ou non (`auth.invalid_credentials`) ; 5 échecs consécutifs : attente\ncroissante (`auth.rate_limited`, `Retry-After`). Pose le cookie `__Host-session`.",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Connecté ; cookie de session posé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "auth.invalid_credentials"
+          },
+          "403": {
+            "description": "auth.no_active_membership"
+          },
+          "429": {
+            "description": "auth.rate_limited, avec Retry-After"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "crate::api"
+        ],
+        "summary": "Déconnexion de cet appareil. Idempotente : une session absente ou expirée répond aussi 204 et efface le cookie.",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Déconnecté"
+          },
+          "403": {
+            "description": "auth.csrf_invalid"
+          }
+        }
+      }
+    },
+    "/api/auth/logout-all": {
+      "post": {
+        "tags": [
+          "crate::api"
+        ],
+        "summary": "Déconnecte tous les appareils de l'utilisateur (`session.revoked_all`).",
+        "operationId": "logout_all",
+        "responses": {
+          "204": {
+            "description": "Toutes les sessions révoquées"
+          },
+          "401": {
+            "description": "auth.unauthenticated"
+          },
+          "403": {
+            "description": "auth.csrf_invalid"
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": [
+          "crate::api"
+        ],
+        "summary": "Profil de la session : utilisateur, rôle, organisation, droits, date du jour de l'organisation, jeton anti-falsification.",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "Profil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "auth.unauthenticated"
+          }
+        }
+      }
+    },
+    "/api/me/organization": {
+      "post": {
+        "tags": [
+          "crate::api"
+        ],
+        "summary": "Change l'organisation active. L'adhésion est revérifiée : une organisation dont on n'est pas membre répond 404 (et, si elle\nexiste chez un autre, `security.cross_org_attempt` est écrit chez l'organisation active de l'appelant).",
+        "operationId": "select_organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectOrganizationPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Organisation active changée ; nouveau cookie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "resource.not_found"
+          }
+        }
+      }
+    },
+    "/api/organization": {
+      "get": {
+        "tags": [
+          "crate::api"
+        ],
+        "summary": "Fiche de l'organisation active (droit `settings.read` ; lecture partielle pour les rôles sans droit d'écriture).",
+        "operationId": "organization",
+        "responses": {
+          "200": {
+            "description": "Organisation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationDetailBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "auth.forbidden"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -60,6 +219,246 @@
   },
   "components": {
     "schemas": {
+      "LoginBody": {
+        "type": "object",
+        "required": [
+          "user",
+          "organizations",
+          "csrf_token",
+          "mfa_required"
+        ],
+        "properties": {
+          "active_organization_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absente tant que l'utilisateur de plusieurs organisations n'en a pas choisi une."
+          },
+          "csrf_token": {
+            "type": "string"
+          },
+          "mfa_required": {
+            "type": "boolean",
+            "description": "Toujours faux à l'étape 02 (double authentification : étape 03)."
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationChoiceBody"
+            }
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserBody"
+          }
+        }
+      },
+      "LoginPayload": {
+        "type": "object",
+        "required": [
+          "identifier",
+          "password"
+        ],
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Téléphone (`+226` et 8 chiffres, formes usuelles acceptées) ou e-mail."
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MeBody": {
+        "type": "object",
+        "required": [
+          "user",
+          "organizations",
+          "features",
+          "permissions",
+          "today",
+          "server_time",
+          "csrf_token",
+          "min_client_version",
+          "settings"
+        ],
+        "properties": {
+          "csrf_token": {
+            "type": "string"
+          },
+          "features": {
+            "type": "object"
+          },
+          "membership": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MembershipBody"
+              }
+            ]
+          },
+          "min_client_version": {
+            "type": "string"
+          },
+          "organization": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrganizationBody"
+              }
+            ]
+          },
+          "organizations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationChoiceBody"
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Codes d'action autorisés (`API_CONTRACTS.md` §4.6), calculés par `authorize`."
+          },
+          "server_time": {
+            "type": "string"
+          },
+          "settings": {
+            "type": "object"
+          },
+          "today": {
+            "type": "string",
+            "description": "Date du jour au fuseau de l'organisation (AAAA-MM-JJ)."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserBody"
+          }
+        }
+      },
+      "MembershipBody": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "OrganizationBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "plan",
+          "kind",
+          "lifecycle",
+          "timezone",
+          "currency"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        }
+      },
+      "OrganizationChoiceBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "plan",
+          "kind",
+          "lifecycle",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "OrganizationDetailBody": {
+        "type": "object",
+        "required": [
+          "name",
+          "plan",
+          "kind",
+          "lifecycle"
+        ],
+        "properties": {
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "plan": {
+            "type": "string"
+          }
+        }
+      },
+      "SelectOrganizationPayload": {
+        "type": "object",
+        "required": [
+          "organization_id"
+        ],
+        "properties": {
+          "organization_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "StatusBody": {
         "type": "object",
         "description": "Réponse de `/health`.",
@@ -70,6 +469,21 @@
           "status": {
             "type": "string",
             "description": "Toujours `ok` ; aucune donnée."
+          }
+        }
+      },
+      "UserBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
           }
         }
       }

@@ -4,6 +4,114 @@
  */
 
 export interface paths {
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Connexion. Réponse identique que l'identifiant existe ou non (`auth.invalid_credentials`) ; 5 échecs consécutifs : attente
+         *     croissante (`auth.rate_limited`, `Retry-After`). Pose le cookie `__Host-session`.
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Déconnexion de cet appareil. Idempotente : une session absente ou expirée répond aussi 204 et efface le cookie. */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Déconnecte tous les appareils de l'utilisateur (`session.revoked_all`). */
+        post: operations["logout_all"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Profil de la session : utilisateur, rôle, organisation, droits, date du jour de l'organisation, jeton anti-falsification. */
+        get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change l'organisation active. L'adhésion est revérifiée : une organisation dont on n'est pas membre répond 404 (et, si elle
+         *     existe chez un autre, `security.cross_org_attempt` est écrit chez l'organisation active de l'appelant).
+         */
+        post: operations["select_organization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fiche de l'organisation active (droit `settings.read` ; lecture partielle pour les rôles sans droit d'écriture). */
+        get: operations["organization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -42,10 +150,73 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        LoginBody: {
+            /** @description Absente tant que l'utilisateur de plusieurs organisations n'en a pas choisi une. */
+            active_organization_id?: string | null;
+            csrf_token: string;
+            /** @description Toujours faux à l'étape 02 (double authentification : étape 03). */
+            mfa_required: boolean;
+            organizations: components["schemas"]["OrganizationChoiceBody"][];
+            user: components["schemas"]["UserBody"];
+        };
+        LoginPayload: {
+            /** @description Téléphone (`+226` et 8 chiffres, formes usuelles acceptées) ou e-mail. */
+            identifier: string;
+            password: string;
+        };
+        MeBody: {
+            csrf_token: string;
+            features: Record<string, never>;
+            membership?: null | components["schemas"]["MembershipBody"];
+            min_client_version: string;
+            organization?: null | components["schemas"]["OrganizationBody"];
+            organizations: components["schemas"]["OrganizationChoiceBody"][];
+            /** @description Codes d'action autorisés (`API_CONTRACTS.md` §4.6), calculés par `authorize`. */
+            permissions: string[];
+            server_time: string;
+            settings: Record<string, never>;
+            /** @description Date du jour au fuseau de l'organisation (AAAA-MM-JJ). */
+            today: string;
+            user: components["schemas"]["UserBody"];
+        };
+        MembershipBody: {
+            role: string;
+        };
+        OrganizationBody: {
+            currency: string;
+            id: string;
+            kind: string;
+            lifecycle: string;
+            name: string;
+            plan: string;
+            timezone: string;
+        };
+        OrganizationChoiceBody: {
+            id: string;
+            kind: string;
+            lifecycle: string;
+            name: string;
+            plan: string;
+            role: string;
+        };
+        OrganizationDetailBody: {
+            city?: string | null;
+            kind: string;
+            lifecycle: string;
+            name: string;
+            plan: string;
+        };
+        SelectOrganizationPayload: {
+            organization_id: string;
+        };
         /** @description Réponse de `/health`. */
         StatusBody: {
             /** @description Toujours `ok` ; aucune donnée. */
             status: string;
+        };
+        UserBody: {
+            display_name: string;
+            id: string;
         };
     };
     responses: never;
@@ -56,6 +227,193 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginPayload"];
+            };
+        };
+        responses: {
+            /** @description Connecté ; cookie de session posé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginBody"];
+                };
+            };
+            /** @description auth.invalid_credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.no_active_membership */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.rate_limited, avec Retry-After */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Déconnecté */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.csrf_invalid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    logout_all: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Toutes les sessions révoquées */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description auth.csrf_invalid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Profil */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeBody"];
+                };
+            };
+            /** @description auth.unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    select_organization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelectOrganizationPayload"];
+            };
+        };
+        responses: {
+            /** @description Organisation active changée ; nouveau cookie */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeBody"];
+                };
+            };
+            /** @description resource.not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    organization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Organisation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationDetailBody"];
+                };
+            };
+            /** @description auth.forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     health: {
         parameters: {
             query?: never;

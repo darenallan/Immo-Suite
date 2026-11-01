@@ -21,7 +21,7 @@ use super::authorize::{Plan, Role};
 use super::identifier::Identifier;
 use super::password::{MAX_CHARS, PasswordService};
 use super::session::{
-    self, absolute_expiry, csrf_hash, csrf_matches, csrf_token, generate_token, hash_token, idle_expiry,
+    self, absolute_expiry, csrf_hash, csrf_matches, csrf_token, generate_token, hash_token, idle_expiry_minutes,
 };
 use super::throttle::{identifier_wait, ip_wait, retry_after_seconds};
 use crate::audit::{self, AuditAction, AuditContext, AuditEntry};
@@ -74,6 +74,16 @@ pub struct SessionGrant {
 pub struct ActiveOrg {
     pub id: Uuid,
     pub name: String,
+    pub plan: Plan,
+    pub kind: String,
+    pub lifecycle: String,
+}
+
+/// Fiche de l'organisation active.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrgSummary {
+    pub name: String,
+    pub city: Option<String>,
     pub plan: Plan,
     pub kind: String,
     pub lifecycle: String,
@@ -132,6 +142,8 @@ pub struct IdentityService {
     passwords: PasswordService,
     clock: Arc<dyn Clock>,
     secret: Arc<Vec<u8>>,
+    /// Durée d'inactivité forcée, en minutes (essai seulement : exercer l'expiration).
+    idle_override: Option<i64>,
 }
 
 impl std::fmt::Debug for IdentityService {
@@ -161,11 +173,66 @@ impl IdentityService {
             passwords,
             clock,
             secret: Arc::new(secret),
+            idle_override: None,
         }
+    }
+
+    /// Force la durée d'inactivité (minutes), pour exercer l'expiration en essai. Les réglages l'interdisent en production.
+    pub fn with_idle_minutes(mut self, minutes: Option<i64>) -> Self {
+        self.idle_override = minutes;
+        self
+    }
+
+    fn idle_expiry(&self, now: DateTime<Utc>, role: Role, absolute: DateTime<Utc>) -> DateTime<Utc> {
+        idle_expiry_minutes(now, self.idle_override.unwrap_or_else(|| role.idle_minutes()), absolute)
     }
 
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
+    }
+
+    /// Les organisations dont l'utilisateur est membre actif, avec son rôle dans chacune.
+    pub async fn organizations_of(&self, user_id: Uuid) -> Result<Vec<OrgChoice>, DbError> {
+        self.my_organizations(user_id).await
+    }
+
+    /// Fiche de l'organisation active de la session (lue sous la RLS : seulement la sienne).
+    pub async fn organization_summary(&self, auth: &Authenticated) -> Result<OrgSummary, DbError> {
+        let org = auth
+            .org
+            .as_ref()
+            .ok_or_else(|| internal("aucune organisation active"))?;
+        let mut tx = self.db.begin(org.id, auth.user.id).await?;
+        let row =
+            sqlx::query("SELECT name, city, plan, kind, lifecycle FROM organizations WHERE id = current_org_id()")
+                .fetch_one(tx.conn())
+                .await?;
+        tx.commit().await?;
+        Ok(OrgSummary {
+            name: row.get(0),
+            city: row.get(1),
+            plan: Plan::parse(&row.get::<String, _>(2)).ok_or_else(|| internal("plan inconnu"))?,
+            kind: row.get(3),
+            lifecycle: row.get(4),
+        })
+    }
+
+    /// Meilleur effort : trace `security.permission_denied` (jeton anti-falsification ou `Origin` absent ou faux) chez l'organisation
+    /// active. Un échec d'écriture est journalisé et ne change pas la réponse de refus.
+    pub async fn trace_permission_denied(&self, auth: &Authenticated, route: &str, reason: &str, client: &ClientInfo) {
+        let Some(org) = &auth.org else { return };
+        let result: Result<(), DbError> = async {
+            let mut tx = self.db.begin(org.id, auth.user.id).await?;
+            let entry = AuditEntry::new(AuditAction::SecurityPermissionDenied, "route", route)
+                .after(json!({ "reason": reason }))
+                .map_err(internal)?;
+            audit::record(&mut tx, &audit_context(auth.user.id, client), entry).await?;
+            tx.commit().await
+        }
+        .await;
+        if let Err(e) = result {
+            tracing::error!(error = %e, "identité : refus non tracé");
+        }
     }
 
     pub fn db(&self) -> &Db {
@@ -495,7 +562,7 @@ impl IdentityService {
         .bind(org_id.map(|o| o.to_string()))
         .bind(csrf_hash(&csrf).to_vec())
         .bind(micros(now))
-        .bind(micros(idle_expiry(now, role, absolute)))
+        .bind(micros(self.idle_expiry(now, role, absolute)))
         .bind(micros(absolute))
         .bind(client.ip.map(|i| i.to_string()))
         .bind(client.user_agent.as_deref().map(|ua| ua.chars().take(300).collect::<String>()))
@@ -582,7 +649,7 @@ impl IdentityService {
                 }
             };
             // l'activité repousse l'échéance d'inactivité, jamais au-delà de l'expiration absolue
-            let idle = idle_expiry(now, role.unwrap_or(Role::Cashier), absolute);
+            let idle = self.idle_expiry(now, role.unwrap_or(Role::Cashier), absolute);
             let mut tx = self.db.begin_system().await?;
             sqlx::query("UPDATE sessions SET last_seen_at = $2::timestamptz, idle_expires_at = $3::timestamptz WHERE id_hash = $1")
                 .bind(id_hash.to_vec())

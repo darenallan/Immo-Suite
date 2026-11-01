@@ -5,18 +5,42 @@
 
 use utoipa::OpenApi;
 
+use crate::api::{
+    LoginBody, LoginPayload, MeBody, MembershipBody, OrganizationBody, OrganizationChoiceBody, OrganizationDetailBody,
+    SelectOrganizationPayload, UserBody,
+};
 use crate::http::StatusBody;
 
 #[derive(OpenApi)]
 #[openapi(
     info(
         title = "Immo Suite API",
-        description = "Contrat d'API d'Immo Suite (étape 01 : /health et /ready seulement)",
+        description = "Contrat d'API d'Immo Suite (étape 02 : sondes, connexion, session, organisation active)",
         version = "0.0.0",
         license(name = "Propriétaire, tous droits réservés")
     ),
-    paths(crate::http::health, crate::http::ready),
-    components(schemas(StatusBody))
+    paths(
+        crate::http::health,
+        crate::http::ready,
+        crate::api::login,
+        crate::api::logout,
+        crate::api::logout_all,
+        crate::api::me,
+        crate::api::select_organization,
+        crate::api::organization
+    ),
+    components(schemas(
+        StatusBody,
+        LoginPayload,
+        LoginBody,
+        UserBody,
+        OrganizationChoiceBody,
+        SelectOrganizationPayload,
+        MeBody,
+        MembershipBody,
+        OrganizationBody,
+        OrganizationDetailBody
+    ))
 )]
 pub struct ApiDoc;
 

@@ -81,6 +81,11 @@ pub fn idle_expiry(now: DateTime<Utc>, role: Role, absolute: DateTime<Utc>) -> D
     (now + Duration::minutes(role.idle_minutes())).min(absolute)
 }
 
+/// Comme `idle_expiry`, avec une durée d'inactivité forcée en minutes (essai : exercer l'expiration, interdit en production).
+pub fn idle_expiry_minutes(now: DateTime<Utc>, minutes: i64, absolute: DateTime<Utc>) -> DateTime<Utc> {
+    (now + Duration::minutes(minutes)).min(absolute)
+}
+
 pub fn absolute_expiry(created: DateTime<Utc>) -> DateTime<Utc> {
     created + Duration::hours(ABSOLUTE_HOURS)
 }

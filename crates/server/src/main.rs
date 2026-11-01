@@ -1,5 +1,6 @@
 //! Binaire `immo` : `immo serve`, `immo version`, `immo openapi`, `immo backup …` (F39). Les autres commandes d'exploitation (`org`, `demo`) arrivent ensuite.
 
+mod admin_cli;
 mod backup_cli;
 mod ops_cli;
 mod pdf_worker;
@@ -10,11 +11,15 @@ use std::net::SocketAddr;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use immo_app::identity::password::PasswordService;
+use immo_app::identity::service::IdentityService;
+use immo_app::platform::clock::SystemClock;
 use immo_app::platform::config::Config;
 use immo_app::platform::db::Db;
 use immo_app::platform::file_store::DiskFileStore;
 use immo_server::http::{self, AppState};
 use immo_server::probe::{DbProbe, Probe, StoreProbe};
+use immo_server::settings::HttpSettings;
 use immo_server::{openapi, version};
 use tracing_subscriber::EnvFilter;
 
@@ -50,6 +55,35 @@ async fn main() -> ExitCode {
             ops_cli::event(&args).await
         }
         Some("pdf-worker") => pdf_worker::run(),
+        Some("password") => {
+            init_tracing();
+            let args: Vec<String> = std::env::args().skip(2).collect();
+            match args.first().map(String::as_str) {
+                Some("calibrate") => admin_cli::password_calibrate(args.get(1..).unwrap_or_default()).await,
+                _ => {
+                    let _ = std::io::stderr().write_all(
+                        b"usage : immo password calibrate [--memory-kib N] [--iterations N] [--parallelism N]
+",
+                    );
+                    ExitCode::from(2)
+                }
+            }
+        }
+        Some(group @ ("user" | "org")) => {
+            init_tracing();
+            let args: Vec<String> = std::env::args().skip(2).collect();
+            match (group, args.first().map(String::as_str)) {
+                ("user", Some("create")) => admin_cli::user_create(args.get(1..).unwrap_or_default()).await,
+                ("org", Some("create")) => admin_cli::org_create(args.get(1..).unwrap_or_default()).await,
+                _ => {
+                    let _ = std::io::stderr().write_all(
+                        b"usage : immo user create ... | immo org create ...
+",
+                    );
+                    ExitCode::from(2)
+                }
+            }
+        }
         Some("work") => {
             init_tracing();
             worker::run().await
@@ -95,6 +129,27 @@ async fn serve() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    let settings = match HttpSettings::from_env(&config) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!(error = %e, "configuration du serveur invalide");
+            return ExitCode::FAILURE;
+        }
+    };
+    let passwords = match PasswordService::new(settings.argon2) {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::error!(error = %e, "paramètres de mot de passe invalides");
+            return ExitCode::FAILURE;
+        }
+    };
+    let identity = IdentityService::new(
+        db.clone(),
+        passwords,
+        Arc::new(SystemClock),
+        settings.session_secret.expose().as_bytes().to_vec(),
+    )
+    .with_idle_minutes(settings.session_idle_minutes);
     let mut probes: Vec<Arc<dyn Probe>> = vec![Arc::new(DbProbe(db))];
     match &config.file_store_dir {
         Some(dir) => probes.push(Arc::new(StoreProbe(DiskFileStore::new(dir.clone())))),
@@ -102,10 +157,13 @@ async fn serve() -> ExitCode {
             "aucun stockage de fichiers configuré : le stockage objet arrive après le choix du fournisseur (DP-70)"
         ),
     }
-    let app = http::router(Arc::new(AppState {
-        probes,
-        version: version(),
-    }));
+    let state = AppState::new(probes, version()).with_identity(
+        identity,
+        settings.allowed_origins,
+        settings.trust_proxy,
+        settings.min_client_version,
+    );
+    let app = http::router(Arc::new(state));
     let listener = match tokio::net::TcpListener::bind(config.bind_addr).await {
         Ok(l) => l,
         Err(e) => {

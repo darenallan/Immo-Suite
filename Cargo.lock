@@ -1404,11 +1404,17 @@ name = "immo-db-tests"
 version = "0.0.0"
 dependencies = [
  "age",
+ "axum",
  "chrono",
+ "http-body-util",
  "immo-app",
+ "immo-server",
  "serde_json",
  "sqlx",
  "tokio",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
  "uuid",
 ]
 

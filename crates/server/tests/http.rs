@@ -26,13 +26,13 @@ impl Probe for Fake {
 }
 
 fn app(probes: Vec<bool>) -> axum::Router {
-    router(Arc::new(AppState {
-        probes: probes
+    router(Arc::new(AppState::new(
+        probes
             .into_iter()
             .map(|ok| Arc::new(Fake(ok)) as Arc<dyn Probe>)
             .collect(),
-        version: "test".into(),
-    }))
+        "test".into(),
+    )))
 }
 
 async fn call(
@@ -67,8 +67,8 @@ async fn health_repond_ok_et_rien_d_autre() {
     assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
     assert_eq!(
         headers.get("x-request-id").unwrap().to_str().unwrap().len(),
-        36,
-        "identifiant de requête (UUID)"
+        10,
+        "code d'incident INC-XXXXXX"
     );
 }
 

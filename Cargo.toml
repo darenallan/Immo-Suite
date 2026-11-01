@@ -24,3 +24,20 @@ print_stderr = "deny"
 
 [workspace.dependencies]
 thiserror = "2"
+
+# Poste de développement à disque presque plein (01/11/2026) : peu d'informations de débogage, aucune pour les dépendances,
+# et pas de compilation incrémentale (CARGO_INCREMENTAL=0 dans les commandes). Ne change ni le comportement ni les lints.
+[profile.dev]
+debug = "line-tables-only"
+incremental = false
+
+[profile.dev.package."*"]
+debug = false
+
+# argon2id optimisé même en développement : le calibrage (100 à 500 ms par vérification, décision n° 48) et les tests de durée
+# ne sont réalistes qu'avec un code optimisé ; seules ces deux petites bibliothèques sont concernées.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3

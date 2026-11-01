@@ -33,6 +33,11 @@ impl Environment {
 pub struct Secret(String);
 
 impl Secret {
+    /// Enveloppe une valeur secrète lue de l'environnement.
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
     /// Le secret en clair, à n'utiliser qu'au point de connexion.
     pub fn expose(&self) -> &str {
         &self.0

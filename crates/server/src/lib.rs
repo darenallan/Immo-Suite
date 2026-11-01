@@ -1,10 +1,14 @@
-//! Serveur HTTP d'Immo Suite : `GET /health`, `GET /ready` (réseau interne), journal JSON à champs en liste blanche.
-//!
-//! Étape 01 : aucune autre route (« hors étape : toute route autre que /health et /ready »).
+//! Serveur HTTP d'Immo Suite : sondes `/health` et `/ready` (réseau interne), routes d'identité (étape 02), journal JSON à champs
+//! en liste blanche, contrat OpenAPI généré.
 
+pub mod api;
+pub mod extract;
 pub mod http;
+pub mod limiter;
 pub mod openapi;
 pub mod probe;
+pub mod problem;
+pub mod settings;
 
 /// Version du binaire : celle du crate et, si connue, le commit de construction (`IMMO_GIT_SHA`).
 pub fn version() -> String {

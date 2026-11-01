@@ -98,7 +98,11 @@ async fn sauvegarde_chiffree_verifiee_et_restauree_a_l_identique() {
     // ───── sauvegarde ─────
     let manifest = backup::run(&clock, &cfg, &sink).await.expect("sauvegarde");
     assert_eq!(manifest.rows_by_table.get("paiements_jouet"), Some(&1200));
-    assert_eq!(manifest.schema_version, Some(202_611_011_200));
+    assert_eq!(
+        manifest.schema_version,
+        Some(latest_migration_version()),
+        "version de schéma = dernière migration"
+    );
     assert_eq!(manifest.object_key, "daily/2026/11/13/immo-20261113T020000Z.dump.age");
     let keys = sink.list("daily/").await.unwrap();
     assert_eq!(keys.len(), 2, "un objet chiffré et son manifeste : {keys:?}");
@@ -272,4 +276,20 @@ async fn alerte_de_sauvegarde_manquante_apres_25_heures_pp15() {
     );
     std::fs::remove_dir_all(&dir).ok();
     db.drop_db().await;
+}
+
+/// Version de la dernière migration du dépôt (préfixe numérique du dernier fichier de `migrations/`).
+fn latest_migration_version() -> i64 {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations");
+    std::fs::read_dir(dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            e.file_name()
+                .to_str()
+                .and_then(|n| n.split('_').next().map(str::to_string))
+        })
+        .filter_map(|v| v.parse::<i64>().ok())
+        .max()
+        .unwrap()
 }

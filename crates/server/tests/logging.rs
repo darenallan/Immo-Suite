@@ -30,13 +30,13 @@ impl Probe for Fake {
 }
 
 fn app(probes: Vec<bool>) -> axum::Router {
-    router(Arc::new(AppState {
-        probes: probes
+    router(Arc::new(AppState::new(
+        probes
             .into_iter()
             .map(|ok| Arc::new(Fake(ok)) as Arc<dyn Probe>)
             .collect(),
-        version: "test".into(),
-    }))
+        "test".into(),
+    )))
 }
 
 async fn call(app: axum::Router, path: &str, peer: &str, headers: &[(&str, &str)], body: &str) -> (StatusCode, String) {

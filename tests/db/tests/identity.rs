@@ -686,3 +686,104 @@ async fn sessions_et_tentatives_privileges_minimaux() {
     }
     db.drop_db().await;
 }
+
+// ───────── PP-10 : pool sous concurrence, sur les tables réelles ─────────
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pp_10_pool_sous_concurrence_zero_lecture_croisee_sur_les_tables_reelles() {
+    use immo_app::platform::db::Db;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    let db = TestDb::create().await;
+    seed(&db).await;
+    // 2 connexions seulement pour 50 tâches : chaque connexion sert tour à tour A et B, la fuite de contexte serait immédiate
+    let app = Db::connect(&db.app_url, 2).await.unwrap();
+    let violations = Arc::new(AtomicU64::new(0));
+    let iterations = Arc::new(AtomicU64::new(0));
+    let mut handles = vec![];
+    for task in 0..50_u32 {
+        let (app, violations, iterations) = (app.clone(), violations.clone(), iterations.clone());
+        handles.push(tokio::spawn(async move {
+            for i in 0..200_u32 {
+                let (org, user) = if (task + i) % 2 == 0 { (ORG_A, U2) } else { (ORG_B, U3) };
+                let mut tx = app.begin(org.parse().unwrap(), user.parse().unwrap()).await.unwrap();
+                let members = sqlx::query("SELECT org_id::text FROM memberships")
+                    .fetch_all(tx.conn())
+                    .await
+                    .unwrap();
+                let audits = sqlx::query("SELECT org_id::text FROM audit_log")
+                    .fetch_all(tx.conn())
+                    .await
+                    .unwrap();
+                let others = members
+                    .iter()
+                    .chain(audits.iter())
+                    .filter(|r| r.get::<String, _>(0) != org)
+                    .count();
+                if others > 0 || members.len() != 2 || audits.len() != 1 {
+                    violations.fetch_add(1, Ordering::SeqCst);
+                }
+                tx.commit().await.unwrap();
+                iterations.fetch_add(1, Ordering::SeqCst);
+            }
+        }));
+    }
+    for h in handles {
+        h.await.unwrap();
+    }
+    assert_eq!(iterations.load(Ordering::SeqCst), 10_000);
+    assert_eq!(
+        violations.load(Ordering::SeqCst),
+        0,
+        "0 lecture croisée sur 10 000 itérations"
+    );
+    // après la rafale, une requête sans contexte sur une connexion du pool ne voit rien
+    for table in ["memberships", "audit_log", "organizations"] {
+        let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+            .fetch_one(app.raw_pool_for_tests())
+            .await
+            .unwrap();
+        assert_eq!(n, 0, "{table} sans contexte");
+    }
+    db.drop_db().await;
+}
+
+// ───────── DP-50 : parité Clock / base pour la date locale ─────────
+
+#[tokio::test(flavor = "multi_thread")]
+async fn parite_de_l_horloge_et_de_la_base_pour_la_date_locale_et_l_heure() {
+    use chrono::{DateTime, Utc};
+    use immo_app::platform::clock::{Clock, FixedClock, OUAGADOUGOU};
+
+    let db = TestDb::create().await;
+    for instant in [
+        "2026-11-13T09:15:00Z",
+        "2026-11-13T23:30:00Z",
+        "2026-12-31T23:59:59Z",
+        "2027-01-01T00:00:00Z",
+        "2026-02-28T23:59:59Z",
+        "2028-02-29T12:00:00Z",
+    ] {
+        let at: DateTime<Utc> = DateTime::parse_from_rfc3339(instant).unwrap().with_timezone(&Utc);
+        let clock = FixedClock::at(at);
+        let db_date: String =
+            sqlx::query_scalar("SELECT (($1::timestamptz) AT TIME ZONE 'Africa/Ouagadougou')::date::text")
+                .bind(instant)
+                .fetch_one(&db.owner)
+                .await
+                .unwrap();
+        assert_eq!(
+            clock.local_date(OUAGADOUGOU).to_string(),
+            db_date,
+            "date locale de {instant}"
+        );
+    }
+    // app_now() est now() en base ordinaire
+    let gap: f64 = sqlx::query_scalar("SELECT abs(extract(epoch from app_now() - now()))::float8")
+        .fetch_one(&db.owner)
+        .await
+        .unwrap();
+    assert!(gap < 1.0);
+    db.drop_db().await;
+}
