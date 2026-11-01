@@ -1,8 +1,8 @@
 # Bilan de l'étape 01 — Socle, CI, environnements, sauvegardes (01/11/2026)
 
-**Verdict : le socle est terminé et éprouvé sur le poste de développement. L'étape ne peut PAS être déclarée « Terminée » au sens de `ROADMAP.md`** :
-six des neuf critères d'acceptation exigent une plateforme de CI, un hébergeur, un second fournisseur de copies ou un domaine, qui n'existent pas
-(C-01, C-02, C-03). Aucune de ces vérifications n'a été faite ni simulée comme si elle l'avait été. Clôture à décider par Mimis (procédure `ROADMAP.md` §8).
+**Verdict : le socle est terminé et éprouvé sur le poste de développement. Étape CLOSE le 01/11/2026 sur décision explicite de Mimis, MALGRÉ les critères non vérifiés ci-dessous, qui restent des dettes ouvertes (jalon J0 non atteint tant qu'elles ne sont pas soldées).** Cinq des neuf critères d'acceptation exigent une plateforme de CI, un hébergeur, un second fournisseur de copies ou un domaine, qui n'existent pas
+(C-01, C-02, C-03) : ils sont « non vérifiés » ou « partiels » ci-dessous. Aucune de ces vérifications n'a été faite ni simulée comme si elle l'avait été.
+Elles sont reportées (liste à la ligne 01 du tableau d'avancement de `ROADMAP.md` §4) et bloquent le critère 10 de l'étape 02 (essai déployé).
 
 ## Critères d'acceptation (`roadmap/etape-01-…md` §6)
 

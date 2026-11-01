@@ -1,8 +1,10 @@
-# Note de reprise (31/10/2026, étape 00 close, étape 01 en cours)
+# Note de reprise (01/11/2026 : étape 01 close avec dettes, étape 02 en attente de validation des fiches)
 
 À lire en premier après un `/clear`. Ne contient aucun secret.
 
 ## Où on en est
+
+- **État au 01/11/2026** : étape 01 **close sur décision de Mimis** avec des dettes ouvertes (ligne 01 du tableau de `ROADMAP.md` §4, `ops/BILAN-ETAPE-01.md`). Étape 02 démarrée : fiches `specs/F01-comptes-organisation.md`, `F02-roles-permissions.md`, `F03-journal-audit.md` rédigées, **à valider par Mimis avant tout code** (procédure `ROADMAP.md` §8). Les points à trancher sont listés à la fin de chaque fiche.
 
 - **Étape 00 terminée** : décisions DP-76 à DP-84 écrites, documents corrigés, résultats dans `spikes/*/NOTE.md` (section 8). Identité Git locale : `Hassan <Hassan@habek.cc>`. Les commits sont locaux (pas de dépôt distant).
 - **Étape 01 en cours** (`ROADMAP.md` §4). Faits et testés localement : fondation (horloge, configuration, `OrgTx`, stockage de fichiers), migration de fondation, rôles SQL (`ops/sql/roles.sql`), 12 tests de base, serveur `/health` et `/ready`, journal JSON, contrat OpenAPI généré, **module de sauvegarde F39** (copie `pg_dump` par `immo_backup`, chiffrement `age` à clé publique, manifeste SHA-256, vérification, restauration chronométrée, alertes) et **commande `immo backup keygen|run|list|verify [--deep]|check|restore`**, éprouvée sur un scénario réel (copie, vérification, restauration, altération détectée, alerte de copie absente).

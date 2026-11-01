@@ -19,7 +19,7 @@
 
 ## Roadmap (ROADMAP.md, proposition à valider)
 
-- Plan en 24 étapes : `ROADMAP.md` (jalons, dépendances, estimation, avancement) et `roadmap/etape-NN-*.md` (autoportants). **Étape 00 terminée le 31/10/2026** (décisions DP-76 à DP-81 ; la mesure réseau (e) est reportée, DP-75). **Étape courante : 01**, socle terminé en local, clôture en attente de Mimis (bilan : `ops/BILAN-ETAPE-01.md`) (tableau d'avancement de `ROADMAP.md` §4 ; le mettre à jour en fin d'étape).
+- Plan en 24 étapes : `ROADMAP.md` (jalons, dépendances, estimation, avancement) et `roadmap/etape-NN-*.md` (autoportants). **Étape 00 terminée le 31/10/2026** (décisions DP-76 à DP-81 ; la mesure réseau (e) est reportée, DP-75). **Étape 01 close le 01/11/2026 sur décision de Mimis, avec écarts reportés (bilan : `ops/BILAN-ETAPE-01.md`) ; étape courante : 02** (tableau d'avancement de `ROADMAP.md` §4 ; le mettre à jour en fin d'étape).
 - Résultats de l'étape 00 : `spikes/*/NOTE.md` (section 8 de chaque note) et `DECISIONS.md` (DP-69 à DP-81). `spikes/REPRISE.md` garde l'état du poste. **Outillage des tâches : `spikes/tools/README.md`** (toute commande longue passe par `spikes/tools/task.ps1`, jamais `python -` ni `python` nu).
 - Démarrer une étape : « Démarre l'étape NN. Lis CLAUDE.md, puis `roadmap/etape-NN-<nom>.md`, puis uniquement les sections qu'il cite. Applique la procédure de `ROADMAP.md` §8 » : fiches `specs/` d'abord, arrêt pour validation, tests d'argent avant le code, démonstration, validation avant l'étape suivante.
 - Les décisions n° 96, 97 et 103 sont prises (DP-72) ; les n° 98 à 102 restent ouvertes : ne pas les appliquer avant leur entrée DP-xx.
