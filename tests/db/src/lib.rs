@@ -330,3 +330,32 @@ pub async fn schema_audit(pool: &PgPool) -> Vec<String> {
 fn yn(b: bool) -> &'static str {
     if b { "oui" } else { "NON" }
 }
+
+/// Horloge de test que le test fait avancer (DP-50 : tout le code lit l'heure par `Clock`).
+pub struct TestClock(std::sync::Mutex<chrono::DateTime<chrono::Utc>>);
+
+impl TestClock {
+    /// Le 13/11/2026 à 09:15 UTC, date du jeu de démonstration.
+    pub fn new() -> Self {
+        use chrono::TimeZone;
+        Self(std::sync::Mutex::new(
+            chrono::Utc.with_ymd_and_hms(2026, 11, 13, 9, 15, 0).unwrap(),
+        ))
+    }
+
+    pub fn advance(&self, d: chrono::Duration) {
+        *self.0.lock().unwrap() += d;
+    }
+}
+
+impl Default for TestClock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl immo_app::platform::clock::Clock for TestClock {
+    fn now(&self) -> chrono::DateTime<chrono::Utc> {
+        *self.0.lock().unwrap()
+    }
+}

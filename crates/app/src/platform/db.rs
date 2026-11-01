@@ -60,6 +60,15 @@ impl Db {
         })
     }
 
+    /// Transaction avec `app.user_id` seul (aucune organisation). Réservée à `identity`, pour la connexion.
+    pub(crate) async fn begin_user(&self, user_id: Uuid) -> Result<UserTx, DbError> {
+        let mut tx = self.pool.begin().await?;
+        #[allow(clippy::disallowed_methods)]
+        let query = sqlx::query("SELECT set_config('app.user_id', $1, true)").bind(user_id.to_string());
+        query.execute(&mut *tx).await?;
+        Ok(UserTx { tx })
+    }
+
     /// Le pool brut, pour les tests d'étanchéité qui doivent reproduire des erreurs d'usage (variante de session).
     #[doc(hidden)]
     pub fn raw_pool_for_tests(&self) -> &PgPool {
@@ -74,6 +83,23 @@ pub(crate) struct SystemTx {
 }
 
 impl SystemTx {
+    pub(crate) fn conn(&mut self) -> &mut PgConnection {
+        &mut self.tx
+    }
+
+    pub(crate) async fn commit(self) -> Result<(), DbError> {
+        self.tx.commit().await.map_err(DbError::from)
+    }
+}
+
+/// Transaction avec l'utilisateur pour seul contexte (aucune organisation active) : sert à retrouver ses propres adhésions avant
+/// le choix d'une organisation (politique `own_memberships`, DATABASE_SCHEMA.md §6.4).
+#[derive(Debug)]
+pub(crate) struct UserTx {
+    tx: Transaction<'static, Postgres>,
+}
+
+impl UserTx {
     pub(crate) fn conn(&mut self) -> &mut PgConnection {
         &mut self.tx
     }

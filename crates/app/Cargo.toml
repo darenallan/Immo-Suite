@@ -15,7 +15,7 @@ immo-domain = { path = "../domain" }
 thiserror = { workspace = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 chrono-tz = "0.10"
-tokio = { version = "1", features = ["fs", "io-util", "time", "rt", "process"] }
+tokio = { version = "1", features = ["fs", "io-util", "time", "rt", "process", "sync"] }
 uuid = { version = "1", features = ["v4"] }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "tls-native-tls", "postgres", "migrate"] }
 age = "0.12.1"
@@ -23,6 +23,10 @@ sha2 = "0.11.1"
 serde_json = "1.0.154"
 tracing = "0.1"
 serde = { version = "1.0.229", features = ["derive"] }
+hmac = "0.13.0"
+subtle = "2.6.1"
+getrandom = "0.4.3"
+argon2 = "0.6.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
