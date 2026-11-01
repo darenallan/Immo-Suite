@@ -16,6 +16,10 @@ x-app: &app
     DATABASE_URL: ${DATABASE_URL:?}
     BIND_ADDR: 0.0.0.0:8080
     RUST_LOG: info
+    # étape 02 : secret de session (32 octets au moins, distinct par environnement) ; derrière Caddy, l'adresse du client est la
+    # dernière entrée de X-Forwarded-For
+    SESSION_SECRET: ${SESSION_SECRET:?}
+    TRUST_PROXY: "true"
 
 services:
   app:

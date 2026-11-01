@@ -1392,6 +1392,7 @@ Tenu dans ce fichier jusqu'au premier changement après le pilote, puis déplac�
 | Date | Version du front (build) | Type | Changement | Retrait prévu | Lien (PR, DP-xx) |
 |---|---|---|---|---|---|
 | 30/10/2026 | — | création | Première version du contrat (proposition, aucune route implémentée) | — | décisions n° 61 à 68 |
+| 01/11/2026 | 0.0.0 | ajout | `POST /api/auth/login`, `POST /api/auth/logout`, `POST /api/auth/logout-all`, `GET /api/me`, `POST /api/me/organization`, `GET /api/organization` (étape 02) ; trois codes d'erreur `auth.no_active_membership`, `auth.organization_required`, `org.suspended` ; `X-Request-Id` au format `INC-XXXXXX` | — | F01, F02, F03, DP-85, DP-87 |
 
 Colonne « Type » : `ajout`, `modification compatible`, `dépréciation`, `retrait`, `correction de document`.
 

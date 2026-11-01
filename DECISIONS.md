@@ -989,6 +989,25 @@ Les entrées DP-52 à DP-68 viennent de l'audit `AUDIT_COHERENCE_2.md` (30/10/20
 - **Statut** : Prise (Mimis, 01/11/2026)
 - **Liens** : R-004 ; DP-48, DP-77 ; F03 §4 ; `SECURITY.md` §6.1.
 
+### DP-87 — Écarts d'implémentation de l'étape 02 (à relire par Mimis)
+
+- **Date** : 01/11/2026
+- **Contexte** : en écrivant le code de l'étape 02 (F01, F02, F03, DP-85, DP-86), plusieurs détails que les documents ne tranchent pas ou qu'ils contredisent sont apparus. Chacun est consigné ici, avec son motif, pour ne pas rester dans le code seul.
+- **Décision** (choix de Claude Code, dans le cadre de la validation des fiches ; **à relire**) :
+  - **Plafond général de débit en mémoire** (300 requêtes par minute par session, 600 par adresse) au lieu de compteurs PostgreSQL : valable pour **une** instance (le pilote en a une). Les compteurs de **connexion** restent dans PostgreSQL (`login_attempts`). À déplacer dans PostgreSQL avant d'exploiter plusieurs instances.
+  - **`own_memberships`** (lecture de ses propres adhésions) ne s'applique que **sans organisation active** : avec l'écriture du `DATABASE_SCHEMA.md` §6.4, un membre de deux organisations verrait, en travaillant dans la première, ses adhésions de la seconde. Une fonction `my_organizations()` (SECURITY DEFINER, limitée à l'utilisateur du contexte) donne la liste de choix.
+  - **`immo_app` n'a pas `INSERT` sur `organizations`** : la création passe par `create_organization()` (plus strict que le schéma). Politiques ajoutées pour le propriétaire (`org_owner_insert`, `own_memberships_owner`) et pour la console (`org_platform_update`), nécessaires aux fonctions SECURITY DEFINER sous RLS forcée.
+  - **Liste blanche de `exists_in_other_org`** : une table (`cross_org_registry`) alimentée par les migrations, pas du code ; la fonction parcourt les autres organisations en posant leur contexte (comme les migrations de données, `DATABASE_SCHEMA.md` §6.3), puis restitue celui de l'appelant. Complexité proportionnelle au nombre d'organisations, sur le seul chemin « introuvable ».
+  - **Rotation de session** à chaque changement d'organisation ; l'expiration absolue de 12 heures est conservée (changer d'organisation ne prolonge rien).
+  - **Toute heure vient de `Clock`** (DP-50) et est écrite explicitement (`attempted_at`, `last_seen_at`, `idle_expires_at`…), pas par le défaut `app_now()` de la base ; un test vérifie la parité de la date locale entre `Clock` et la base.
+  - **Identifiant de requête** : code d'incident `INC-XXXXXX` (alphabet sans caractères ambigus), pas un UUID.
+  - **Profil de compilation** : informations de débogage réduites et pas de compilation incrémentale (disque presque plein du poste) ; `argon2` et `blake2` optimisés même en développement, pour que le calibrage et les tests de durée soient réalistes.
+  - **Calibrage argon2id** : outil `immo password calibrate`. Mesure sur le PC de développement (Intel i7-10510U) : 19 Mio × 2 itérations = **19 ms** (hors de la cible de 100 à 500 ms de la décision n° 48) ; 128 Mio × 3 = 215 ms ; 256 Mio × 3 = 443 ms. La valeur de départ **n'est pas changée** : l'essai n'existe pas encore, et 4 vérifications simultanées de 128 Mio coûteraient 512 Mo de mémoire. À décider avec le serveur retenu (C-02).
+- **Alternatives écartées** : compteurs PostgreSQL pour le plafond général (surcoût d'écritures à chaque requête, inutile avec une instance) ; liste blanche en code Rust (une migration de table ne pourrait pas l'étendre) ; `UPDATE(csrf_hash)` pour `immo_app`.
+- **Conséquences** : `DATABASE_SCHEMA.md` §6.11 consigne les écarts de schéma ; le calibrage de l'essai reste ouvert.
+- **Statut** : Prise (Claude Code dans le cadre de DP-85, 01/11/2026), **à relire par Mimis**
+- **Liens** : DP-48, DP-50, DP-77, DP-85, DP-86 ; décision n° 48.
+
 ## Décisions ouvertes
 
 Les 15 décisions de la section 26 du dossier, plus trois ajoutées hors dossier (n° 16 à 18). La colonne « Recommandation du dossier » n'est **pas** une décision. Sont prises : n° 1 (DP-28, puis DP-34, puis DP-52 et DP-53), 2, 4, 6, 7 (DP-76), 8, 9, 10, 14, 16, 18, 19, 20, 21, 23, 25, 27, 30, 31, 32, 34, 35, 36, 40, 41, 46 (confirmée, DP-78), 50, 51, 55, 60, 61, 62, 64, 67, 69, 70, 73 à 77, 79, 80 et 87 (voir la colonne Statut). Les autres sont **Ouvertes**. Prises ensuite (étape 01) : n° 24, 53, 95 (DP-82) et n° 88, 89, 92 (DP-83).
