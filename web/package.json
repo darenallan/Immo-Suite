@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:real": "playwright test -c playwright.real.config.ts",
     "size": "npm run build && size-limit",
     "api:types": "openapi-typescript ../openapi.json -o src/api/schema.d.ts",
     "api:check": "openapi-typescript ../openapi.json -o src/api/schema.generated.d.ts && node scripts/same-file.mjs src/api/schema.d.ts src/api/schema.generated.d.ts"

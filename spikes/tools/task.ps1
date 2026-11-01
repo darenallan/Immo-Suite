@@ -49,8 +49,15 @@ function Read-State($n) { $f = Join-Path $State "$n.json"; if (Test-Path $f) { G
 function Write-State($n, $o) { ($o | ConvertTo-Json -Depth 5) | Set-Content (Join-Path $State "$n.json") -Encoding UTF8 }
 function Alive($procId, $started) {
   $p = Get-Process -Id $procId -ErrorAction SilentlyContinue
-  # même PID ET même heure de démarrage : protège contre la réutilisation d'un numéro de processus
-  return [bool]($p -and (-not $started -or [math]::Abs(($p.StartTime.ToUniversalTime() - ([datetime]$started).ToUniversalTime()).TotalSeconds) -lt 2))
+  if (-not $p) { return $false }
+  if (-not $started) { return $true }
+  # même PID ET même heure de démarrage : protège contre la réutilisation d'un numéro de processus.
+  # Incident du 01/11/2026 : le numéro d'un superviseur terminé a été réutilisé par un processus protégé dont l'heure de démarrage est
+  # illisible (StartTime nul) ; l'ancien code plantait. Une identité non prouvée n'est jamais « vivante » : on ne touche à rien.
+  $startTime = $null
+  try { $startTime = $p.StartTime } catch { $startTime = $null }
+  if (-not $startTime) { return $false }
+  return [bool]([math]::Abs(($startTime.ToUniversalTime() - ([datetime]$started).ToUniversalTime()).TotalSeconds) -lt 2)
 }
 function Descendants($rootId) {
   # Descendants PROUVÉS : un enfant n'est retenu que s'il a été créé APRÈS son parent. Sans cette vérification, la
