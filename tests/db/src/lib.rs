@@ -22,7 +22,8 @@ use sqlx::{Executor, PgPool, Row};
 use tokio::sync::OnceCell;
 
 /// Tables globales sans `org_id` ni RLS (DATABASE_SCHEMA.md §6.5) ; `_sqlx_migrations` est le journal des migrations.
-pub const GLOBAL_TABLES: [&str; 9] = [
+pub const GLOBAL_TABLES: [&str; 10] = [
+    "cross_org_registry",
     "users",
     "sessions",
     "login_attempts",

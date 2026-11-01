@@ -98,7 +98,7 @@ async fn sauvegarde_chiffree_verifiee_et_restauree_a_l_identique() {
     // ───── sauvegarde ─────
     let manifest = backup::run(&clock, &cfg, &sink).await.expect("sauvegarde");
     assert_eq!(manifest.rows_by_table.get("paiements_jouet"), Some(&1200));
-    assert_eq!(manifest.schema_version, Some(202_610_311_800));
+    assert_eq!(manifest.schema_version, Some(202_611_011_200));
     assert_eq!(manifest.object_key, "daily/2026/11/13/immo-20261113T020000Z.dump.age");
     let keys = sink.list("daily/").await.unwrap();
     assert_eq!(keys.len(), 2, "un objet chiffré et son manifeste : {keys:?}");
