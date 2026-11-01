@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | À faire |
+| Statut | **Faite et éprouvée en local le 01/11/2026, en attente de la validation de Mimis** : fiches validées (DP-88), critères 1 à 9 vérifiés (le 9 sans la contre-passation, étape 06), démonstration jouée sur la pile locale, rapport `ops/rapports/ETAPE-03.md`, écarts DP-89 à relire, second avis C-19 à désigner |
 | Version / Date | 0.1 / 30/10/2026 |
 | Tranche | T1 (F01, F02, F03 : suite) |
 | Effort | L, environ 15 JD |

@@ -2703,6 +2703,26 @@ Tous **[PILOTE]**, bloquants en CI (ils complètent ceux d'`ARCHITECTURE.md` §5
 - `users.failed_logins` et `users.locked_until` restent inutilisées : la limitation s'appuie sur `login_attempts`, qui couvre aussi les identifiants inconnus.
 - `purge_order` : `audit_log` (800) et `memberships` (810) ; les tables métier suivantes s'inscrivent avant.
 
+### 6.12 Écarts de l'étape 03 (DP-88, « migration d'identité 2 »)
+
+- `invitations.renewed_from` (clé étrangère composite) et index unique partiel `(org_id, coalesce(invitee_phone, invitee_email)) WHERE accepted_at IS NULL AND revoked_at IS NULL`.
+- `password_resets.revoked_at` (droit `UPDATE`) ; `users.totp_last_step bigint` (droit `UPDATE`) ; `organizations.row_version integer NOT NULL DEFAULT 1`.
+- Table globale `totp_backup_codes` (`id`, `user_id`, `code_hash bytea` unique, `used_at`, `created_at` ; `SELECT`, `INSERT`, `UPDATE(used_at)`), sans RLS, ajoutée à la liste blanche d'ISO-6.
+- `support_grants.staff_id` nullable, sans clé étrangère jusqu'à la console (accord donné à l'équipe HABEK, F40) ; fonction `support_grant_active(org, scope)` et politique `support_access` : accord `read` = lecture seule, `import_assist` = écriture ; `immo_platform` n'a aucun droit sur `support_grants`.
+- Garde « dernier gérant » (G-16) : déclencheur sur `memberships`, étendu au `owner` du plan Propriétaire (code `user.last_manager`) ; **verrou consultatif par organisation** (`pg_advisory_xact_lock`) avant de compter, au lieu de `FOR UPDATE` : deux retraits simultanés ne s'interbloquent pas, le second voit l'état validé du premier (DP-89).
+- Fonctions : `support_grant_active(org, portée)`, `apply_support_policies(table)` et `apply_org_policies(table)` (réservées à `immo_owner`, rejouées pour toute table à `org_id`), `invitation_by_token(empreinte)` (lecture d'une invitation par son jeton avant toute organisation active ; `immo_app` ne lit pas `invitations` hors contexte), déclencheur `organizations_defaults` (ligne `org_settings` avec le préfixe provisoire `REC`).
+- `audit_log` : la console y écrit ses lignes `actor_kind = 'support'` avec tout accord actif ; elle ne peut pas se faire passer pour un utilisateur.
+- `cross_org_registry` : types `membership`, `invitation`, `support_grant` ajoutés. `purge_order` : positions 700 à 740.
+
+### 6.13 Écarts de l'étape 04 (DP-90, « migration d'observation »)
+
+- `product_events` : colonne `session_id text` (16 hexadécimaux de l'empreinte de la session, **sans clé étrangère** : les sessions sont purgées bien avant 13 mois) ; `occurred_at` imposé par un déclencheur `BEFORE INSERT` ; `TRUNCATE` interdit par déclencheur ; **aucun `UPDATE`** ; `DELETE` limité par une politique **RESTRICTIVE** aux lignes de plus de 13 mois (`retention`). Index `(occurred_at)` pour la purge.
+- `error_reports` : même politique `retention` sur `last_seen_at` ; contrainte sur l'empreinte (64 caractères hexadécimaux) ; `sample` de 2 Kio au plus.
+- `feedback_reports` : colonnes `reference text UNIQUE` (`SIG-` + six chiffres, séquence `feedback_reference_seq`, trous sans conséquence) et `idempotency_key uuid` (unique par organisation et utilisateur) ; contrôles de catégorie (`bug`, `request`, `question`), de statut et de taille du contexte ; `handled_by` **sans clé étrangère** jusqu'à la console (étape 11).
+- **Exception à R-009** : `immo_platform` lit `product_events`, `error_reports` et `feedback_reports` de toutes les organisations **sans accord support** (politique `platform_read`), n'y insère rien, et ne modifie que `status`, `handled_by`, `handled_at` des signalements (politique `platform_update`, droit de colonne). Les autres tables à `org_id` restent soumises à l'accord. **Garde modifiée : second avis C-19 requis.**
+- Fonction `purge_expired_observation()` (`SECURITY DEFINER`, exécutée par `immo_app`) : supprime, organisation par organisation, les événements et les erreurs de plus de 13 mois (tâche `observation.purge`, quotidienne).
+- `purge_order` : positions 750 à 770.
+
 ## 7. Évolution du schéma pendant le pilote
 
 Règles reprises d'`ARCHITECTURE.md` §8.1 (étendre, migrer, contracter ; en avant seulement), précisées pour ce schéma. **[PILOTE]** pour les règles ; l'outillage se complète en route.

@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | À faire |
+| Statut | Faite et éprouvée en local le 01/11/2026, en attente de la validation de Mimis (`ops/rapports/ETAPE-04.md`) |
 | Version / Date | 0.1 / 30/10/2026 |
 | Tranche | T1 (journalisation technique de F39 ; exigence d'`ARCHITECTURE.md` §8.4) |
 | Effort | M, environ 7 JD |

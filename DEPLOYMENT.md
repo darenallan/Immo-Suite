@@ -146,6 +146,8 @@ fusion sur main → CI (TESTING_QA §10, étapes 1 et 2) → construction de l'i
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | stockage objet | environnement du conteneur | un seau par environnement |
 | `SESSION_SECRET` | secret de session | idem | rotation annuelle (révoque les sessions) |
 | Clé de chiffrement des clés applicatives | chiffrement de `payout_details_enc`, `totp_secret_enc`, `id_document_enc` | idem, **copie hors ligne** | sauvegardée à part en deux exemplaires ; sa perte rend ces champs illisibles |
+| `PLATFORM_DATABASE_URL` | rôle `immo_platform` | **travailleur `immo work` seulement** (et `immo event`) | écrit les alertes de signalement dans `platform_events` (F39-observation, DP-90) ; absente, l'alerte reste dans le journal |
+| `ENABLE_TEST_ROUTES` | `1` pour monter `GET /api/_test/server-error` | **essai seulement** ; **ignorée en production** | provoque une erreur 500 réelle pour exercer le suivi d'erreurs ; jamais dans `openapi.json` |
 | Variables de sauvegarde | voir section 5 | **tâche de sauvegarde seulement** | pas dans le conteneur applicatif |
 
 - **Où vivent les secrets de production** : fichier d'environnement protégé sur le serveur (droits restreints, hors dépôt) **ou** variables de la plateforme gérée ; **pas de coffre dédié au pilote** (un coffre de plus à exploiter). Les copies de référence, et celles de récupération, sont dans le gestionnaire de mots de passe de l'équipe (section 3.5). Rotation : annuelle, et **le jour du départ** d'une personne qui y avait accès (`SECURITY.md` §5.4).

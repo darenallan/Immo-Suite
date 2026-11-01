@@ -243,10 +243,14 @@ Les messages de la colonne « Texte du front » reprennent `UI_UX_DESIGN.md` (Mi
 | `auth.reauth_required` | 403 | ✱ « Confirmez votre mot de passe pour continuer. » | `SECURITY.md` §3.4 |
 | `auth.totp_required`, `auth.totp_invalid` | 401 | ✱ « Saisissez le code de votre application d'authentification. » | `SECURITY.md` §3.4 |
 | `auth.identifier_taken` | 409 | « Cet identifiant a déjà un compte. Voulez-vous vous connecter ? » | F01 |
+| `auth.password_weak` | 422 | selon `params.reason` : `too_short` « Au moins 10 caractères. », `too_long` « 128 caractères au plus. », `common` « Ce mot de passe est trop courant. Choisissez-en un autre. », `contains_identifier` « Le mot de passe ne doit pas contenir votre identifiant. », `same_as_current` « Choisissez un mot de passe différent de l'actuel. » | F01 §9.3, DP-88 |
+| `auth.reset_expired` | 410 | ✱ « Ce lien n'est plus valable. Demandez-en un nouveau à votre gérant. » (même corps pour un lien inconnu, utilisé, révoqué ou expiré) | F01 §9.4, DP-88 |
+| `audit.immutable` | 405 | « Le journal d'audit ne peut pas être modifié. » (`Allow: GET`) | R-007, F03 §8.1 |
 | `auth.no_active_membership` | 403 | ✱ « Votre compte n'a accès à aucune organisation. Contactez votre gérant. » | F01, DP-85 |
 | `auth.organization_required` | 403 | ✱ « Choisissez une organisation pour continuer. » | F01, DP-85 |
 | `org.suspended` | 403 | ✱ « Cette organisation est suspendue. Contactez le support. » | F01, DP-85 |
-| `invitation.expired` | 410 | « Cette invitation a expiré (validité : 7 jours). Demandez au gérant de la renvoyer. » | F01 |
+| `invitation.expired` | 410 | « Cette invitation n'est plus valable. Demandez au gérant de la renvoyer. » (même corps pour une invitation expirée, révoquée ou déjà utilisée, DP-88) | F01 |
+| `invitation.already_pending` | 409 | « Une invitation est déjà en attente pour cet identifiant. Renvoyez-la. » | F01 |
 | `resource.not_found` | 404 | « Introuvable. Cette page n'existe pas ou vous n'y avez pas accès. » | R-004 |
 | `feature.disabled`, `plan.feature_unavailable` | 403 | ✱ « Cette fonction n'est pas disponible pour votre organisation. » | R-082, `ARCHITECTURE.md` §8.2 |
 | `request.malformed`, `request.unknown_field`, `request.cursor_invalid` | 400 / 422 | ✱ « Un problème est survenu. Réessayez. » + code d'incident | `SECURITY.md` §7.1 |
@@ -1100,7 +1104,7 @@ POST /api/units/…0210/interventions
 | Méthode et chemin | Droit | Corps → réponse | Erreurs propres | Règles · F · Prio |
 |---|---|---|---|---|
 | `POST /auth/login` | public | `{ identifier, password }` → `{ user, organizations[], csrf_token, mfa_required }` ; cookie posé, nouvel identifiant de session | `auth.invalid_credentials`, `auth.rate_limited` | SECURITY §3 · F01 · P/T1 |
-| `POST /auth/totp/verify` | session partielle | `{ code }` → comme `login` | `auth.totp_invalid` (5 essais par minute, code déjà utilisé refusé) | SECURITY §3.4 · F01 · P/T1 |
+| `POST /auth/totp/verify` | défi signé (5 minutes, DP-88) | `{ challenge, code }` (code TOTP ou code de secours) → comme `login` | `auth.totp_invalid` (5 essais par minute, code déjà utilisé refusé) | SECURITY §3.4 · F01 · P/T1 |
 | `POST /auth/logout`, `POST /auth/logout-all` | session | → `204` ; `logout-all` révoque toutes les sessions (`session.revoked_all`) | | F01 · P/T1 |
 | `POST /auth/reauth` | session | `{ password }` → `204` ; valable 5 minutes | `auth.invalid_credentials` | SECURITY §3.4 · P/T1 |
 | `GET /me` | session | → `{ user, membership: { role }, organization: { name, plan, kind, lifecycle, timezone, currency }, features, permissions[], today, server_time, csrf_token, min_client_version, settings: { payment_confirm_threshold, default_paper, share_link_ttl_days } }` | | F01, F02 · P/T1 |
@@ -1125,8 +1129,8 @@ Réponses de connexion et de refus **identiques** que l'identifiant existe ou no
 | `POST /invitations` | `user.manage` (🔐 si rôle gérant) | `{ phone ou email, role, unit_ids[] }` → `{ invitation, url, expires_at }` ; lien de **7 jours**, jeton affiché une fois, copiable dans WhatsApp | `auth.identifier_taken`, `validation.phone_format` | F01 · P/T1 |
 | `GET /invitations` | `user.manage` | → invitations (`pending`, `expired`, `accepted`, `revoked`) | | F01 · P/T1 |
 | `POST /invitations/{id}/revoke`, `POST /invitations/{id}/renew` | `user.manage` | → invitation ; `renew` crée un nouveau jeton | | F01 · P/T1 |
-| `PATCH /users/{membership_id}` | `user.manage` 🔐 | `{ role }` → utilisateur ; effet **sans reconnexion**, sessions révoquées (le rôle est relu à chaque requête) | `user.last_manager` | R-081 · F02 · P/T1 |
-| `POST /users/{membership_id}/disable` 🔐, `POST …/enable` | `user.manage` | → utilisateur ; toutes ses sessions révoquées | `user.last_manager` | R-081 · F02 · P/T1 |
+| `PATCH /users/{membership_id}` | `user.manage` 🔐 | `{ role }` → utilisateur ; effet **sans reconnexion**, aucune session révoquée (le rôle est relu à chaque requête, DP-88) | `user.last_manager` | R-081 · F02 · P/T1 |
+| `POST /users/{membership_id}/disable` 🔐, `POST …/enable` | `user.manage` | → utilisateur ; ses sessions **de cette organisation** révoquées à la désactivation (DP-88) ; `enable` exige la confirmation par mot de passe | `user.last_manager` | R-081 · F02 · P/T1 |
 | `PUT /users/{membership_id}/unit-assignments` | `user.manage` | `{ unit_ids[] }` → affectations (agent terrain, gestionnaire) | | R-081 · F02 · P/T1 |
 | `GET /role-settings`, `PUT /role-settings` | `user.manage` | `{ role, action, allowed }` pour `record_payment`, `import_data`, `export_data` (gestionnaire, collaborateur) → réglage ; audité | | F02 · P/T1 |
 | `GET /support-grants` | `support.grant` | → accords et historique des accès (qui, quand, combien de temps) | | R-009 · F40 · P/T2 |
@@ -1309,6 +1313,8 @@ L'export complet d'une organisation est une **commande** (`immo org export`), pa
 | `POST /client-errors` | `events.create` | `{ message, screen, client_version, request_ids[] }` → `204` ; **aucun texte de l'écran** | idem · P/T1 |
 
 - Même domaine, **sans cookie supplémentaire, sans identifiant publicitaire, sans service tiers** (dossier §12).
+- **Implémentation (étape 04, DP-90)** : toutes les routes exigent une session et `X-CSRF-Token`. Un lot de plus de **8 Kio** : `413 request.too_large` ; champ inconnu **au niveau du corps** : `422 request.unknown_field` (la tolérance ne vaut qu'à l'intérieur de `events[]`). Au-delà de **20 événements**, les 20 premiers sont traités et les suivants écartés et comptés. Un événement écarté est compté par une ligne `event_discarded` (motif et nombre, jamais le nom reçu) ; la réponse est `204` en production et `422 validation.failed` (`params.reason = event_discarded`) en développement et en essai. Limites par session : `/events` 30 par minute, `/client-errors` 10 par minute (`429 rate_limit.exceeded`, `Retry-After`). Le front n'envoie que `screen_viewed` et `validation_error` ; les autres événements sont d'origine serveur et un événement d'origine serveur reçu du front est écarté. La liste blanche est versionnée dans `tests/contract/events-whitelist.json`.
+- `POST /client-errors` : `message` nettoyé par le serveur (suites de 6 chiffres, adresses électroniques, jetons remplacés par « … », 200 caractères au plus) ; ni pile ni adresse conservées ; `screen` hors liste → `S00`.
 - Les noms d'événement et leurs propriétés forment une **liste blanche** (`ARCHITECTURE.md` §8.4) : `screen_viewed`, `payment_form_opened`, `payment_form_abandoned`, `search_performed`, `validation_error`, `reminder_prepared`, `reminder_abandoned`, `statement_previewed`, `import_*`, `feature_used`, … Les événements d'argent (`payment_recorded`, `payment_idempotent_replay`) sont **écrits par le serveur**, pas par le front.
 - **Aucune donnée personnelle** dans `properties` : ni nom, ni téléphone, ni texte libre ; des identifiants internes, durées, comptes, codes d'erreur. Un événement inconnu ou une propriété hors liste est **écarté et compté**, sans erreur renvoyée (réponse `204`) ; en essai il échoue bruyamment pour que l'erreur se voie.
 - Conservation 13 mois puis agrégats ; organisations `demo` et `test` exclues des indicateurs.
@@ -1320,6 +1326,8 @@ L'export complet d'une organisation est une **commande** (`immo org export`), pa
 | `POST /feedback` | `feedback.create` | `{ category: "bug" ou "request" ou "question", description, can_call_back, context: { screen, path, client_version, viewport, last_request_ids[5], last_error_code } }` → `201 { id, reference }` ; notification immédiate à l'équipe | `ARCHITECTURE.md` §8.4 · décision n° 28 · P/T1 |
 
 - **Pas de capture d'écran** au pilote. `path` ne porte **ni paramètre de requête ni jeton** ; `description` est du texte libre : il est traité comme du texte, stocké sans analyse et jamais journalisé.
+- **Implémentation (étape 04, DP-90)** : en-tête facultatif `Idempotency-Key` (UUID) : un rejeu avec la même clé renvoie le même `{ id, reference }` sans nouvelle ligne ; une clé illisible : `400 request.malformed`. Description de 5 à 4 000 caractères après suppression des espaces de bord (`422 validation.failed`, champ `description`, codes `validation.too_short` ou `validation.too_long`) ; caractères de contrôle retirés. `context.path` est ramené à un modèle (paramètres, fragments, jetons et identifiants retirés) ; éléments de contexte illisibles écartés. Limite : **5 signalements par heure et par utilisateur** (`429 rate_limit.exceeded`). La création, l'événement `feedback_submitted` et la tâche d'alerte `feedback.notify` partagent une transaction ; l'alerte (`platform_events` : `feedback.received`) ne contient ni description, ni nom, ni numéro.
+- **Route d'essai** `GET /api/_test/server-error` (erreur 500 réelle) : montée seulement si `APP_ENV` n'est pas `production` **et** `ENABLE_TEST_ROUTES=1` ; absente du contrat.
 - Le suivi (`new`, `in_progress`, `done`, `rejected`) se fait dans la console. Le nombre de clients concernés alimente le registre des demandes (dossier §21).
 
 ### 7.17 Recherche, opérations, santé
@@ -1393,6 +1401,12 @@ Tenu dans ce fichier jusqu'au premier changement après le pilote, puis déplac�
 |---|---|---|---|---|---|
 | 30/10/2026 | — | création | Première version du contrat (proposition, aucune route implémentée) | — | décisions n° 61 à 68 |
 | 01/11/2026 | 0.0.0 | ajout | `POST /api/auth/login`, `POST /api/auth/logout`, `POST /api/auth/logout-all`, `GET /api/me`, `POST /api/me/organization`, `GET /api/organization` (étape 02) ; trois codes d'erreur `auth.no_active_membership`, `auth.organization_required`, `org.suspended` ; `X-Request-Id` au format `INC-XXXXXX` | — | F01, F02, F03, DP-85, DP-87 |
+
+| 01/11/2026 | 0.0.0 | modification compatible | Étape 03 (DP-88) : `POST /auth/totp/verify` reçoit un **défi signé** de 5 minutes (`{ challenge, code }`) au lieu d'une session partielle ; `{id}` de `POST /users/{id}/password-resets` = identifiant d'adhésion ; `PATCH /users/{id}` ne révoque aucune session, la désactivation révoque celles de l'organisation seulement ; `enable` exige la confirmation par mot de passe ; texte de `invitation.expired` ; nouveau code `invitation.already_pending` (409) ; `GET /audit` renvoie `meta.actors` ; `PUT/PATCH/DELETE /audit` : 405 `audit.immutable` | — | F01 §9, F02 §7, F03 §8, F40, DP-88 |
+
+| 01/11/2026 | 0.0.0 | ajout | Étape 03 (DP-88, DP-89) : implémentation de `PATCH /me`, `PUT /me/password`, `POST /me/totp`, `POST /me/totp/confirm`, `POST /auth/totp/verify`, `POST /auth/reauth`, `POST /users/{id}/password-resets`, `POST /auth/password-reset/complete`, `GET /invitations/{token}`, `POST /invitations/accept`, `PATCH /organization`, `GET/PATCH /settings`, `GET /users`, `PATCH /users/{id}`, `POST /users/{id}/disable|enable`, `PUT /users/{id}/unit-assignments`, `GET/POST /invitations`, `POST /invitations/{id}/revoke|renew`, `GET/PUT /role-settings`, `GET/POST /support-grants`, `POST /support-grants/{id}/revoke`, `GET /audit`, `PUT|PATCH|DELETE /audit/{id}` (405). `POST /auth/login` : `user` et `csrf_token` nuls et `challenge` présent quand `mfa_required` ; `GET /organization` porte `version` ; `GET /audit` : dates `AAAA-MM-JJ`, réponse `{ items[], next_cursor, meta.actors[] }` ; codes `auth.password_weak`, `auth.reset_expired`, `audit.immutable` au catalogue | — | F01 §9, F02 §7, F03 §8, F40, DP-89 |
+
+| 01/11/2026 | 0.0.0 | ajout | Étape 04 (DP-90) : `POST /api/events`, `POST /api/client-errors`, `POST /api/feedback` (+ en-tête `Idempotency-Key`) ; `rate_limit.exceeded` sur ces trois routes ; `request.too_large` sur `/events` et `/client-errors` à 8 Kio ; codes de champ `validation.too_short` et `validation.invalid` | — | F39-observation, DP-90 |
 
 Colonne « Type » : `ajout`, `modification compatible`, `dépréciation`, `retrait`, `correction de document`.
 

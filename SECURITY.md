@@ -127,9 +127,9 @@ Priorité : **P** = mesure indispensable avant le pilote ; **A** = peut venir pe
 - **Conséquences** :
   - identifiant de session : 256 bits tirés du générateur aléatoire du système ; **seule son empreinte SHA-256 est stockée** (`sessions.id_hash`) ;
   - cookie nommé `__Host-session` : `Secure`, `HttpOnly`, `SameSite=Lax`, chemin `/`, sans attribut `Domain` ;
-  - nouvel identifiant à la connexion, au changement de mot de passe et au changement de rôle ;
+  - nouvel identifiant à la connexion, au changement de mot de passe et au changement d'organisation ; **un changement de rôle ne révoque rien** (le rôle est relu à chaque requête, DP-88) ;
   - **durées proposées** : inactivité 30 minutes pour caissier, gestionnaire, agent terrain et comptable ; 60 minutes pour gérant et propriétaire ; expiration absolue 12 heures pour tous ; console HABEK : 15 minutes d'inactivité, 8 heures au plus. Pas de « se souvenir de moi » au pilote [valeurs proposées, à confirmer avec les caissiers : une expiration trop courte fait partager les mots de passe] ;
-  - changement de mot de passe, désactivation d'un utilisateur ou retrait de rôle : **toutes** ses sessions sont révoquées ; une action « déconnecter tous mes appareils » est offerte [PILOTE] ; la liste des sessions actives avec leur appareil [APRÈS] ;
+  - changement de mot de passe : **toutes** ses sessions sont révoquées ; désactivation d'un membre : ses sessions **de cette organisation** (DP-88) ; une action « déconnecter tous mes appareils » est offerte [PILOTE] ; la liste des sessions actives avec leur appareil [APRÈS] ;
   - **falsification de requête** : `SameSite=Lax`, **plus** un jeton propre à la session (`sessions.csrf_hash`) exigé sur toute requête qui écrit, plus contrôle de l'en-tête `Origin` ;
   - aucune réponse d'API n'est mise en cache (`Cache-Control: no-store`).
 
@@ -235,7 +235,7 @@ Reprise de la section 11.2 du dossier de cadrage, source unique (`CONTEXTE.md`).
 | Contact de secours, notes | Oui | Non | Non | Non |
 | Pièce d'identité (si activée) | Masquée, affichage tracé (`tenant.id_document_viewed`) | Jamais | Jamais | Jamais |
 | Coordonnées de paiement du mandant | Gérant seul, masquées par défaut | Jamais | Jamais | Jamais |
-| Adresse IP de l'audit | Gérant, comptable (lecture) | Jamais | Jamais | Lecture |
+| Adresse IP de l'audit | Gérant, propriétaire direct, comptable (lecture) (DP-88) | Jamais | Jamais | Lecture |
 
 - **Données sensibles masquées par défaut**, révélées par un geste explicite et tracé (R-019).
 - Les comptes d'intégration ou de service **n'existent pas** au pilote (pas d'API publique, `CONTEXTE.md`).
@@ -361,7 +361,7 @@ Chaque ligne : qui (utilisateur, système ou agent de support), quoi (code `obje
 | Baux | `lease.created`, `lease.activated`, `lease.amended`, `lease.notice_given`, `lease.notice_cancelled`, `lease.ended`, `installment.line_added`, `installment.line_voided` |
 | Patrimoine | `unit.works_set`, `unit.archived`, `tenant.created`, `tenant.updated`, `tenant.merged`, `tenant.archived`, `tenant.id_document_viewed`, `owner.updated`, `mandate.created`, `mandate.rate_changed`, `mandate.closed` |
 | Comptes rendus | `statement.validated`, `statement.reopened`, `payout.recorded`, `expense.imputation_changed` |
-| Accès et droits | `auth.login`, `auth.password_changed`, `auth.mfa_enabled`, `auth.reset_issued`, `auth.reset_used`, `user.invited`, `membership.accepted`, `membership.role_changed`, `user.disabled`, `session.revoked_all` |
+| Accès et droits | `auth.login`, `auth.password_changed`, `auth.mfa_enabled`, `auth.reset_issued`, `auth.reset_used`, `user.invited`, `invitation.renewed`, `invitation.revoked`, `membership.accepted`, `membership.role_changed`, `user.disabled`, `user.enabled`, `user.updated`, `auth.mfa_backup_used`, `session.revoked_all` (cinq codes ajoutés par DP-88) |
 | Données | `export.created`, `import.confirmed`, `import.cancelled`, `settings.updated`, `feature.toggled` |
 | Support | `support.access_granted`, `support.access_revoked`, `support.record_viewed`, `support.import_assist` |
 | Sécurité | `security.cross_org_attempt` (R-004), `security.permission_denied` sur action sensible, `security.rate_limited` |
@@ -520,8 +520,9 @@ Cette section décrit des **pratiques**. Elle ne dit pas ce que la loi exige : t
 | Mandant : nom, téléphone, mode et coordonnées de reversement | Rendre compte et reverser | Coordonnées chiffrées par l'application |
 | Tiers payeur : nom, téléphone facultatif | Mentionner qui a payé sur la quittance (R-088) | Téléphone facultatif |
 | Utilisateur : nom, téléphone ou e-mail, adresse IP, sessions | Authentification, audit, sécurité | Adresse IP conservée 30 jours dans les journaux, durée de l'audit dans le journal |
-| Événements d'usage (`product_events`) | Mesurer l'usage pendant le pilote | **Aucune** donnée personnelle dans les propriétés ; identifiant interne pseudonyme ; ni cookie publicitaire, ni service tiers |
-| Signalements d'utilisateurs | Corriger des problèmes | Pas de capture d'écran au pilote ; contexte technique minimal |
+| Événements d'usage (`product_events`) | Mesurer l'usage pendant le pilote | **Aucune** donnée personnelle dans les propriétés : liste blanche fermée, valeurs refusées si elles contiennent `@`, `+226` ou six chiffres de suite ; référence de session pseudonyme (16 caractères de l'empreinte du jeton, jamais le jeton) ; conservation 13 mois ; ni cookie publicitaire, ni service tiers (DP-90) |
+| Erreurs (`error_reports`) | Corriger des bogues | Agrégées par empreinte ; jamais de corps de requête, de paramètre ni de message de bibliothèque ; message du front nettoyé (limite connue : un mot libre écrit par le code du front ne se reconnaît pas) |
+| Signalements d'utilisateurs (`feedback_reports`) | Corriger des problèmes | Pas de capture d'écran au pilote ; contexte technique minimal ; texte libre stocké tel quel, **jamais journalisé** ni copié dans un événement ou une alerte ; lu par l'équipe HABEK **sans accord support** (exception à R-009, DP-90, avertissement dans le formulaire) |
 
 - Aucune donnée n'est vendue, cédée ni utilisée pour de la publicité ou de l'IA (règle d'or 11) ; les données de test viennent d'une copie **anonymisée, avec l'accord écrit de l'agence** (décision n° 15).
 
