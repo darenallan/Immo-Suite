@@ -1,5 +1,17 @@
-*.sh text eol=lf
-Dockerfile text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
-Caddyfile text eol=lf
+# Fins de ligne : LF partout, dans le dépôt comme dans la copie de travail, quel que soit core.autocrlf du poste.
+# Les tests de contrat (openapi.json, tests/contract/events-whitelist.json) et le découpage de ops/sql/indicateurs.sql
+# comparent ou découpent des octets : un clone Windows en CRLF les faisait échouer (reprise du 03/11/2026).
+* text=auto eol=lf
+
+# Binaires : jamais convertis.
+*.docx binary
+*.xlsx binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.age binary

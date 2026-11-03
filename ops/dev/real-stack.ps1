@@ -3,13 +3,13 @@
   Monte la PILE RÉELLE d'Immo Suite sur le poste, joue les parcours de navigateur dessus, puis la démonte (étape 02).
 
 .DESCRIPTION
-  1. base jetable sur le PostgreSQL local (port 5433), rôles de production (ops/sql/roles.sql), migrations (immo migrate) ;
+  1. base jetable sur le PostgreSQL local (port 5433 par défaut, voir -Port), rôles de production (ops/sql/roles.sql), migrations (immo migrate) ;
   2. comptes et organisation créés par la ligne de commande (immo user create, immo org create) ;
   3. serveur Rust (immo serve) et front (vite preview, qui relaie /api) lancés par task.ps1 ;
   4. Playwright (web/e2e-real) à 390 px et 1440 px ;
   5. arrêt des deux serveurs par task.ps1 et suppression de la base.
 
-  Prérequis : PostgreSQL local démarré (spikes/REPRISE.md), Rust GNU, Node, Chrome, `cargo build -p immo-server`.
+  Prérequis : PostgreSQL local démarré (spikes/REPRISE.md), Rust (GNU ou MSVC), Node, Chrome, `cargo build -p immo-server`.
   Ne touche ni au PostgreSQL du port 5432 ni à Neon. Aucun secret n'est écrit dans le dépôt : tout est tiré au hasard à chaque essai.
 
 .PARAMETER ShortIdle
@@ -17,8 +17,12 @@
 
 .PARAMETER KeepStack
   Laisse la pile en marche à la fin (pour une démonstration à la main) : à arrêter ensuite par task.ps1 stop (noms real-api, real-web).
+
+.PARAMETER Port
+  Port du PostgreSQL local jetable (utilisateur postgres sans mot de passe). Par défaut TEST_PG_PORT s'il est défini, sinon 5433.
+  Poste du 03/11/2026 : 5433 et 5434 sont pris par d'autres PostgreSQL, la base jetable écoute sur 5435.
 #>
-param([switch]$ShortIdle, [switch]$KeepStack)
+param([switch]$ShortIdle, [switch]$KeepStack, [int]$Port = $(if ($env:TEST_PG_PORT) { [int]$env:TEST_PG_PORT } else { 5433 }))
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -37,7 +41,7 @@ $webPort = 4173
 
 function Psql([string]$database, [string[]]$arguments, [string]$user = 'postgres', [string]$password = $null) {
     if ($password) { $env:PGPASSWORD = $password } else { Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue }
-    & $psql -h 127.0.0.1 -p 5433 -U $user -d $database -v ON_ERROR_STOP=1 -q -X -At @arguments
+    & $psql -h 127.0.0.1 -p $Port -U $user -d $database -v ON_ERROR_STOP=1 -q -X -At @arguments
     if ($LASTEXITCODE -ne 0) { throw "psql a échoué ($database)" }
 }
 
@@ -51,13 +55,13 @@ try {
     Psql $db @('-v', "owner_pw=$($pw.owner)", '-v', "app_pw=$($pw.app)", '-v', "platform_pw=$($pw.platform)", '-v', "backup_pw=$($pw.backup)", '-f', (Join-Path $repo 'ops\sql\roles.sql'))
 
     Write-Output '== migrations'
-    $env:MIGRATION_DATABASE_URL = "postgres://immo_owner:$($pw.owner)@127.0.0.1:5433/$db"
+    $env:MIGRATION_DATABASE_URL = "postgres://immo_owner:$($pw.owner)@127.0.0.1:$Port/$db"
     & $bin migrate (Join-Path $repo 'migrations') 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'immo migrate a échoué' }
 
     Write-Output '== comptes et organisation par la ligne de commande'
     $env:APP_ENV = 'development'
-    $env:DATABASE_URL = "postgres://immo_app:$($pw.app)@127.0.0.1:5433/$db"
+    $env:DATABASE_URL = "postgres://immo_app:$($pw.app)@127.0.0.1:$Port/$db"
     [IO.File]::WriteAllText($passwordFile, $userPassword + "`n", (New-Object System.Text.UTF8Encoding($false)))
     $accounts = @(@('+22670123456', 'Awa Kabore'), @('+22670123457', 'Issa Ouedraogo'), @('+22670123458', 'Compte bloque un'), @('+22670123459', 'Compte bloque deux'), @('+22670123460', 'Gerant securite un'), @('+22670123461', 'Gerant securite deux'))
     foreach ($a in $accounts) {
@@ -72,7 +76,7 @@ try {
     Psql $db @('-c', "INSERT INTO memberships (org_id, user_id, role) SELECT o.id, u.id, 'manager' FROM organizations o, users u WHERE o.name = 'Agence Horizon' AND u.login_phone IN ('+22670123460', '+22670123461')")
     # la création d'un compte est refusée en production
     $env:APP_ENV = 'production'
-    $env:DATABASE_URL = "postgres://immo_app:$($pw.app)@127.0.0.1:5433/$db?sslmode=verify-full"
+    $env:DATABASE_URL = "postgres://immo_app:$($pw.app)@127.0.0.1:$Port/$db?sslmode=verify-full"
     $env:PUBLIC_BASE_URL = 'https://exemple.invalid'
     & $bin user create --phone '+22670999999' --name 'Refus attendu' 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'immo user create aurait dû être refusé en production' }
@@ -81,7 +85,7 @@ try {
 
     Write-Output '== serveur et front'
     $env:APP_ENV = 'development'
-    $env:DATABASE_URL = "postgres://immo_app:$($pw.app)@127.0.0.1:5433/$db"
+    $env:DATABASE_URL = "postgres://immo_app:$($pw.app)@127.0.0.1:$Port/$db"
     $env:SESSION_SECRET = (Pw) + (Pw)
     # clé de chiffrement des champs (secret TOTP) : 64 caractères hexadécimaux tirés au hasard à chaque essai
     $env:FIELD_ENCRYPTION_KEY = -join ((1..64) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) })
@@ -95,7 +99,7 @@ try {
     & $task start -Name real-api -Persistent -TimeoutSec 3600 -ReadyPort $apiPort -Exe $bin -ArgList serve | Out-Null
     $started += 'real-api'
     # étape 04 : le travailleur envoie l'alerte d'un signalement (platform_events, rôle immo_platform)
-    $env:PLATFORM_DATABASE_URL = "postgres://immo_platform:$($pw.platform)@127.0.0.1:5433/$db"
+    $env:PLATFORM_DATABASE_URL = "postgres://immo_platform:$($pw.platform)@127.0.0.1:$Port/$db"
     & $task start -Name real-work -Persistent -TimeoutSec 3600 -Exe $bin -ArgList work | Out-Null
     $started += 'real-work'
     $env:API_URL = "http://127.0.0.1:$apiPort"
@@ -106,7 +110,7 @@ try {
     Write-Output '== parcours de navigateur sur la pile réelle (390 px et 1440 px)'
     $env:E2E_PASSWORD = $userPassword
     $env:E2E_PSQL = $psql
-    $env:E2E_DB_URL = "postgres://postgres@127.0.0.1:5433/$db"
+    $env:E2E_DB_URL = "postgres://postgres@127.0.0.1:$Port/$db"
     $env:E2E_BASE_URL = "http://127.0.0.1:$webPort"
     if ($ShortIdle) { $env:E2E_SHORT_IDLE = '1' } else { Remove-Item Env:E2E_SHORT_IDLE -ErrorAction SilentlyContinue }
     & $task run -Name real-e2e -TimeoutSec 600 -WorkDir (Join-Path $repo 'web') -Exe cmd.exe -ArgList '/c', 'npm run test:e2e:real' 2>&1 | ForEach-Object { "$_" }
