@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 're
 import type { Me } from '../api/client';
 import { useAuth } from '../auth';
 import { FeedbackDialog } from '../observation/FeedbackDialog';
+import { SearchBox } from '../screens/Catalog';
 import { fr, type RoleKey } from '../texts/fr';
 import { NAV_ENTRIES, bottomBar, isRole, visibleEntries, type NavEntry } from './nav';
 
@@ -104,6 +105,9 @@ export function Shell({ me, path, navigate, children }: ShellProps) {
       </aside>
       <header className="topbar">
         <p className="topbar__title">{me.organization?.name}</p>
+        {me.permissions.includes('search.use') && (
+          <SearchBox navigate={navigate} canCreateTenant={me.permissions.includes('catalog.write')} />
+        )}
         <div className="usermenu">
           <button
             ref={userButton}

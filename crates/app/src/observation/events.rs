@@ -154,7 +154,83 @@ pub const SPECS: &[EventSpec] = &[
         origin: Origin::Server,
         props: &[("reason", Kind::Choice(DISCARD_REASONS)), ("count", Kind::Int(1, 1000))],
     },
+    // étape 05 (F04 §4.1, DP-92) : la longueur et le groupe choisi, jamais le texte tapé
+    EventSpec {
+        name: "search_performed",
+        origin: Origin::Client,
+        props: &[
+            ("length", Kind::Int(2, 80)),
+            ("group", Kind::Choice(SEARCH_GROUPS)),
+            ("empty", Kind::Choice(YES_NO)),
+        ],
+    },
+    // étape 07 (F09 règle 21, DP-96) : le mode et des indicateurs, jamais un montant ni une référence
+    EventSpec {
+        name: "payment_recorded",
+        origin: Origin::Server,
+        props: &[
+            ("method", Kind::Choice(PAYMENT_METHODS)),
+            ("partial", Kind::Choice(YES_NO)),
+            ("advance", Kind::Choice(YES_NO)),
+            ("credit", Kind::Choice(YES_NO)),
+            ("late_entry_days", Kind::Int(0, 3650)),
+        ],
+    },
+    EventSpec {
+        name: "payment_idempotent_replay",
+        origin: Origin::Server,
+        props: &[("route", Kind::Route)],
+    },
+    EventSpec {
+        name: "payment_external_ref_duplicate",
+        origin: Origin::Server,
+        props: &[("method", Kind::Choice(PAYMENT_METHODS))],
+    },
+    EventSpec {
+        name: "payment_form_opened",
+        origin: Origin::Client,
+        props: &[("screen", Kind::Screen)],
+    },
+    EventSpec {
+        name: "payment_form_abandoned",
+        origin: Origin::Client,
+        props: &[("screen", Kind::Screen)],
+    },
+    // étape 08 (F10 règle 17, DP-98) : format, canal, durée ; jamais un numéro ni un jeton
+    EventSpec {
+        name: "receipt_pdf_rendered",
+        origin: Origin::Server,
+        props: &[("paper", Kind::Choice(PAPERS)), ("duration_ms", Kind::Int(0, 3_600_000))],
+    },
+    EventSpec {
+        name: "receipt_pdf_failed",
+        origin: Origin::Server,
+        props: &[("paper", Kind::Choice(PAPERS))],
+    },
+    EventSpec {
+        name: "receipt_shared",
+        origin: Origin::Server,
+        props: &[("channel", Kind::Choice(SEND_CHANNELS))],
+    },
+    EventSpec {
+        name: "share_link_opened",
+        origin: Origin::Server,
+        props: &[("document", Kind::Choice(DOCUMENTS))],
+    },
+    EventSpec {
+        name: "share_link_expired",
+        origin: Origin::Server,
+        props: &[("document", Kind::Choice(DOCUMENTS))],
+    },
 ];
+
+const PAYMENT_METHODS: &[&str] = &["cash", "mobile_money", "bank_transfer", "cheque"];
+const PAPERS: &[&str] = &["a4", "a5"];
+const SEND_CHANNELS: &[&str] = &["whatsapp", "print_a4", "print_a5", "link_copied"];
+const DOCUMENTS: &[&str] = &["receipt"];
+
+const SEARCH_GROUPS: &[&str] = &["tenants", "units", "receipts", "none"];
+const YES_NO: &[&str] = &["yes", "no"];
 
 /// Au plus 20 événements par lot (API_CONTRACTS.md §7.15).
 pub const MAX_BATCH: usize = 20;
@@ -399,6 +475,52 @@ impl ProductEvent {
 
     pub fn feedback_submitted(screen: &str, category: &str) -> Option<Self> {
         server_event("feedback_submitted", json!({ "screen": screen, "category": category }))
+    }
+
+    pub fn payment_recorded(
+        method: &str,
+        partial: bool,
+        advance: bool,
+        credit: bool,
+        late_entry_days: i64,
+    ) -> Option<Self> {
+        let yn = |b: bool| if b { "yes" } else { "no" };
+        server_event(
+            "payment_recorded",
+            json!({ "method": method, "partial": yn(partial), "advance": yn(advance), "credit": yn(credit),
+                    "late_entry_days": late_entry_days.clamp(0, 3650) }),
+        )
+    }
+
+    pub fn payment_idempotent_replay() -> Option<Self> {
+        server_event("payment_idempotent_replay", json!({ "route": "/api/payments" }))
+    }
+
+    pub fn payment_external_ref_duplicate(method: &str) -> Option<Self> {
+        server_event("payment_external_ref_duplicate", json!({ "method": method }))
+    }
+
+    pub fn receipt_pdf_rendered(paper: &str, duration_ms: u64) -> Option<Self> {
+        server_event(
+            "receipt_pdf_rendered",
+            json!({ "paper": paper, "duration_ms": duration_ms.min(3_600_000) }),
+        )
+    }
+
+    pub fn receipt_pdf_failed(paper: &str) -> Option<Self> {
+        server_event("receipt_pdf_failed", json!({ "paper": paper }))
+    }
+
+    pub fn receipt_shared(channel: &str) -> Option<Self> {
+        server_event("receipt_shared", json!({ "channel": channel }))
+    }
+
+    pub fn share_link_opened() -> Option<Self> {
+        server_event("share_link_opened", json!({ "document": "receipt" }))
+    }
+
+    pub fn share_link_expired() -> Option<Self> {
+        server_event("share_link_expired", json!({ "document": "receipt" }))
     }
 
     pub fn discarded(reason: DiscardReason, count: u32) -> Option<Self> {

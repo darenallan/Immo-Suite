@@ -903,8 +903,8 @@ async fn a3_chaque_route_de_l_etape_refuse_chaque_role_sans_le_droit() {
     }
     assert_eq!(
         checked,
-        7 * 23,
-        "23 routes à droit (20 de l'étape 03, 3 d'observation), 7 rôles"
+        7 * 70,
+        "70 routes à droit (20 de l'étape 03, 3 d'observation, 23 du patrimoine, 12 des baux, 8 de l'encaissement, 4 de la quittance), 7 rôles"
     );
     a.db.drop_db().await;
 }

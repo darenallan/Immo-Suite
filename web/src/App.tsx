@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './auth';
 import { fr } from './texts/fr';
 import { AuditScreen } from './screens/AuditScreen';
+import { LeaseScreen, LeasesScreen } from './screens/Leases';
+import { CollectScreen, PaymentScreen, PaymentsScreen } from './screens/Payments';
+import { PropertiesScreen, PropertyScreen, TenantScreen, TenantsScreen, UnitScreen } from './screens/Catalog';
 import { ChooseOrganization } from './screens/ChooseOrganization';
 import { Login } from './screens/Login';
 import { InvitePage, ResetPage, readPublicLink, type PublicLink } from './screens/PublicLinks';
@@ -71,7 +74,20 @@ function Screens() {
     navigate('/');
   };
   let content;
-  const entry = NAV_ENTRIES.find((e) => e.path === path);
+  // fiches (étape 05) : /biens/{id} et /lots/{id} relèvent de « Biens et lots », /locataires/{id} de « Locataires »
+  const detail = /^\/(biens|lots|locataires|baux|paiements)\/([0-9a-f-]{36})$/.exec(path);
+  const entryPath =
+    detail === null
+      ? path
+      : detail[1] === 'locataires'
+        ? '/locataires'
+        : detail[1] === 'baux'
+          ? '/baux'
+          : detail[1] === 'paiements'
+            ? '/paiements'
+            : '/biens';
+  const entry = NAV_ENTRIES.find((e) => e.path === entryPath);
+  const canWrite = me.permissions.includes('catalog.write');
   if (entry === undefined) {
     content = <NotFound onHome={home} />;
   } else if (!isRole(role) || !isVisible(entry, role, me.permissions)) {
@@ -85,6 +101,33 @@ function Screens() {
     content = <SettingsScreen permissions={me.permissions} />;
   } else if (entry.id === 'audit') {
     content = <AuditScreen />;
+  } else if (detail !== null && detail[1] === 'biens') {
+    content = <PropertyScreen id={detail[2] ?? ''} canWrite={canWrite} navigate={navigate} />;
+  } else if (detail !== null && detail[1] === 'lots') {
+    content = <UnitScreen id={detail[2] ?? ''} canWrite={canWrite} navigate={navigate} />;
+  } else if (detail !== null && detail[1] === 'paiements') {
+    content = <PaymentScreen id={detail[2] ?? ''} navigate={navigate} />;
+  } else if (detail !== null && detail[1] === 'baux') {
+    content = <LeaseScreen id={detail[2] ?? ''} canWrite={canWrite} navigate={navigate} />;
+  } else if (detail !== null) {
+    content = <TenantScreen id={detail[2] ?? ''} canWrite={canWrite} navigate={navigate} />;
+  } else if (entry.id === 'properties') {
+    content = (
+      <PropertiesScreen
+        canWrite={canWrite}
+        canCreateOwner={me.permissions.includes('mandate.write')}
+        ownerPlan={me.organization.plan === 'owner'}
+        navigate={navigate}
+      />
+    );
+  } else if (entry.id === 'leases') {
+    content = <LeasesScreen canWrite={canWrite} navigate={navigate} />;
+  } else if (entry.id === 'collect') {
+    content = <CollectScreen navigate={navigate} />;
+  } else if (entry.id === 'payments') {
+    content = <PaymentsScreen navigate={navigate} />;
+  } else if (entry.id === 'tenants') {
+    content = <TenantsScreen canWrite={canWrite} navigate={navigate} />;
   } else {
     content = <ComingSoon title={fr.nav.entries[entry.id]} />;
   }

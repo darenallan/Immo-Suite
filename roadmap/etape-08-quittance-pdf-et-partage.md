@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | À faire |
+| Statut | En cours : fiche `specs/F10-quittance-pdf-et-partage.md` validée le 06/11/2026 (DP-98) ; code en cours |
 | Version / Date | 0.1 / 30/10/2026 |
 | Tranche | T1 (F10) |
 | Effort | M, environ 10 JD |

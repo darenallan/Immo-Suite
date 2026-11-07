@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Immo Suite API",
-    "description": "Contrat d'API d'Immo Suite (étapes 02 à 04 : sondes, connexion, session, comptes, membres, invitations, paramètres, accès support, journal, événements d'usage, erreurs du front, signalements)",
+    "description": "Contrat d'API d'Immo Suite (étapes 02 à 06 : sondes, connexion, session, comptes, membres, invitations, paramètres, accès support, journal, événements d'usage, erreurs du front, signalements, biens, lots, locataires, mandants, recherche unique, baux, échéancier)",
     "license": {
       "name": "Propriétaire, tous droits réservés"
     },
@@ -400,6 +400,47 @@
         }
       }
     },
+    "/api/installment-lines/{id}/void": {
+      "post": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Annule une ligne d'échéance avec un motif (R-036).",
+        "operationId": "void_line",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Ligne annulée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/invitations": {
       "get": {
         "tags": [
@@ -603,6 +644,391 @@
           },
           "410": {
             "description": "invitation.expired"
+          }
+        }
+      }
+    },
+    "/api/leases": {
+      "get": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Baux (filtres `status`, `unit_id`, `tenant_id`) ; l'agent terrain ne voit que ceux de ses lots.",
+        "operationId": "list_leases",
+        "responses": {
+          "200": {
+            "description": "Baux",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeasesBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Crée un bail brouillon ; les avertissements ne bloquent pas (R-024).",
+        "operationId": "create_lease",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeasePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Bail brouillon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaseBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "lease.kind_not_allowed, unit.archived"
+          }
+        }
+      }
+    },
+    "/api/leases/{id}": {
+      "get": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Fiche d'un bail.",
+        "operationId": "get_lease",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaseBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Modifie un bail brouillon (`If-Match`) ; un bail activé se change par avenant.",
+        "operationId": "patch_lease",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeasePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaseBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "lease.not_draft"
+          },
+          "412": {
+            "description": "concurrency.version_mismatch"
+          }
+        }
+      }
+    },
+    "/api/leases/{id}/activate": {
+      "post": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Active un bail : échéances générées, lot occupé (R-020, R-028, R-093) ; `Idempotency-Key` : un rejeu renvoie le bail actif.",
+        "operationId": "activate_lease",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bail actif",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaseBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "lease.overlap, unit.under_works, lease.not_draft"
+          }
+        }
+      }
+    },
+    "/api/leases/{id}/amendments": {
+      "post": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Avenant daté, jamais rétroactif (R-023, R-104) ; une nouvelle date de fin prolonge le bail (R-091).",
+        "operationId": "amend_lease",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendmentPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaseBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "lease.not_in_progress"
+          }
+        }
+      }
+    },
+    "/api/leases/{id}/installment-lines": {
+      "post": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Ajoute un arriéré daté ou une ligne exceptionnelle (R-035, R-036).",
+        "operationId": "add_line",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Ligne",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/leases/{id}/installments": {
+      "get": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Échéancier d'un bail, lignes annulées comprises ; statut et jours de retard calculés à la lecture.",
+        "operationId": "lease_installments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Échéances",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallmentsBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/leases/{id}/payment-context": {
+      "get": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Contexte de paiement d'un bail (S04) : un seul aller-retour (§6.1).",
+        "operationId": "payment_context",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contexte de paiement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentContextBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/leases/{id}/payments": {
+      "get": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Paiements d'un bail (onglet Paiements de S09 et S10).",
+        "operationId": "lease_payments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paiements du bail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/leases/{id}/terminate": {
+      "post": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Résilie un bail (R-030) : motif obligatoire, lot de nouveau vacant.",
+        "operationId": "terminate_lease",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminatePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bail terminé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaseBody"
+                }
+              }
+            }
           }
         }
       }
@@ -847,6 +1273,658 @@
         }
       }
     },
+    "/api/owners": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Mandants (nom et type pour tous ; téléphone et mode de reversement pour le gérant, DP-92).",
+        "operationId": "list_owners",
+        "responses": {
+          "200": {
+            "description": "Mandants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnersPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Crée un mandant (gérant du plan Agence).",
+        "operationId": "create_owner",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Mandant créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "plan.feature_unavailable"
+          }
+        }
+      }
+    },
+    "/api/owners/{id}": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Fiche d'un mandant.",
+        "operationId": "get_owner",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mandant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Modifie un mandant (`If-Match`).",
+        "operationId": "patch_owner",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Mandant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "owner.archived"
+          },
+          "412": {
+            "description": "concurrency.version_mismatch"
+          }
+        }
+      }
+    },
+    "/api/owners/{id}/archive": {
+      "post": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Archive un mandant (refusé s'il est propriétaire d'un bien non archivé, ou pour la fiche du propriétaire direct).",
+        "operationId": "archive_owner",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mandant archivé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnerBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "owner.has_properties, owner.is_self"
+          }
+        }
+      }
+    },
+    "/api/payments": {
+      "get": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Journal des paiements (S11), du plus récent au plus ancien, 100 au plus.",
+        "operationId": "list_payments",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "method",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lease_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tenant_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unit_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paiements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentsBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Encaisse un paiement et émet sa quittance (F09, F10). `Idempotency-Key` obligatoire (DP-49) ; rejeu : même réponse,\n`Idempotent-Replay: true`.",
+        "operationId": "record_payment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Paiement et quittance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentRecordedBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "payment.external_ref_duplicate, payment.lease_not_in_progress, payment.stale_allocation"
+          },
+          "422": {
+            "description": "payment.confirmation_required, payment.surplus_not_confirmed, payment.allocation_invalid, idempotency.key_reused_with_different_body"
+          }
+        }
+      }
+    },
+    "/api/payments/preview": {
+      "post": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Aperçu d'affectation (R-043, R-044, R-046), sans écriture.",
+        "operationId": "preview_payment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentPreviewPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Aperçu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentPreviewBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/payments/{id}": {
+      "get": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Un paiement : affectations et quittance.",
+        "operationId": "get_payment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paiement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Un paiement validé est immuable (R-047, E-08) : toujours `405 payment.immutable`.",
+        "operationId": "payment_immutable",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "405": {
+            "description": "payment.immutable"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Variante `DELETE` (documentée pour le registre).",
+        "operationId": "payment_immutable_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "405": {
+            "description": "payment.immutable"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Variante `PATCH` (documentée pour le registre).",
+        "operationId": "payment_immutable_patch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "405": {
+            "description": "payment.immutable"
+          }
+        }
+      }
+    },
+    "/api/properties": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Biens (filtres `q`, `district`, `owner_id`, `archived`) ; l'agent terrain ne voit que les biens de ses lots.",
+        "operationId": "list_properties",
+        "responses": {
+          "200": {
+            "description": "Biens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertiesPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Crée un bien ; `single_unit` crée aussi son lot (maison seule, R-010).",
+        "operationId": "create_property",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Bien créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation.failed"
+          }
+        }
+      }
+    },
+    "/api/properties/{id}": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Fiche d'un bien et ses lots.",
+        "operationId": "get_property",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bien",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Modifie un bien (`If-Match`).",
+        "operationId": "patch_property",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Bien",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "property.archived"
+          },
+          "412": {
+            "description": "concurrency.version_mismatch"
+          },
+          "428": {
+            "description": "concurrency.version_required"
+          }
+        }
+      }
+    },
+    "/api/properties/{id}/archive": {
+      "post": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Archive un bien et ses lots ; rien n'est supprimé (R-005).",
+        "operationId": "archive_property",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bien archivé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/receipts": {
+      "get": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Quittances, 100 au plus (filtre `q` sur le numéro).",
+        "operationId": "list_receipts",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quittances",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptsBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/receipts/{id}": {
+      "get": {
+        "tags": [
+          "crate::api_payment"
+        ],
+        "summary": "Une quittance (S25) : instantané figé, rendu de l'écran sans calcul.",
+        "operationId": "get_receipt",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quittance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/role-settings": {
       "get": {
         "tags": [
@@ -902,6 +1980,40 @@
           },
           "428": {
             "description": "concurrency.version_required"
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Recherche unique (`q`, 2 à 80 caractères) : locataires, lots, quittances ; huit résultats au plus par groupe.",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Résultats groupés",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "validation.failed"
           }
         }
       }
@@ -1049,6 +2161,478 @@
           },
           "404": {
             "description": "resource.not_found"
+          }
+        }
+      }
+    },
+    "/api/tenants": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Locataires (filtres `q`, `archived`) ; champs masqués selon le rôle.",
+        "operationId": "list_tenants",
+        "responses": {
+          "200": {
+            "description": "Locataires",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantsPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Crée un locataire ; un numéro déjà porté répond `409 tenant.phone_duplicate` avec la fiche existante (R-017).",
+        "operationId": "create_tenant",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Locataire créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "tenant.phone_duplicate"
+          },
+          "422": {
+            "description": "validation.failed"
+          }
+        }
+      }
+    },
+    "/api/tenants/{id}": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Fiche d'un locataire (contact de secours et notes absents pour les rôles en lecture, §4.5).",
+        "operationId": "get_tenant",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locataire",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Modifie un locataire (`If-Match`).",
+        "operationId": "patch_tenant",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Locataire",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "tenant.phone_duplicate, tenant.archived"
+          },
+          "412": {
+            "description": "concurrency.version_mismatch"
+          }
+        }
+      }
+    },
+    "/api/tenants/{id}/archive": {
+      "post": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Archive un locataire ; son numéro est libéré (R-005, R-017).",
+        "operationId": "archive_tenant",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locataire archivé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tenants/{id}/id-document": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Pièce d'identité : désactivée au pilote (`403 feature.disabled`, R-019).",
+        "operationId": "tenant_id_document",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "feature.disabled"
+          }
+        }
+      }
+    },
+    "/api/tenants/{id}/merge": {
+      "post": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Fusionne cette fiche dans `into_id` : elle est archivée, son historique reste attaché (R-017, DP-92).",
+        "operationId": "merge_tenant",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Fiche conservée",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "tenant.merge_invalid"
+          }
+        }
+      }
+    },
+    "/api/units": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Lots (filtres `property_id`, `usage`, `kind`, `status`, `q`, `archived`) ; l'agent terrain ne voit que ses lots.",
+        "operationId": "list_units",
+        "responses": {
+          "200": {
+            "description": "Lots",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitsPage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Crée un lot (référence unique dans le bien, R-011 ; champs selon l'usage, R-012).",
+        "operationId": "create_unit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Lot créé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unit.reference_duplicate"
+          }
+        }
+      }
+    },
+    "/api/units/{id}": {
+      "get": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Fiche d'un lot.",
+        "operationId": "get_unit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Modifie un lot (`If-Match`) ; `property_id` n'est pas modifiable.",
+        "operationId": "patch_unit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Lot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unit.archived, unit.reference_duplicate"
+          },
+          "412": {
+            "description": "concurrency.version_mismatch"
+          }
+        }
+      }
+    },
+    "/api/units/{id}/archive": {
+      "post": {
+        "tags": [
+          "crate::api_catalog"
+        ],
+        "summary": "Archive un lot (R-005).",
+        "operationId": "archive_unit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lot archivé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/units/{id}/leases": {
+      "get": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Baux d'un lot (onglet Baux de S07).",
+        "operationId": "unit_leases",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Baux du lot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeasesBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/units/{id}/works": {
+      "post": {
+        "tags": [
+          "crate::api_lease"
+        ],
+        "summary": "Pose ou retire « en travaux » sur un lot vacant (R-093).",
+        "operationId": "set_works",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorksPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Lot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnitBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "unit.works_requires_vacant"
           }
         }
       }
@@ -1358,6 +2942,88 @@
         },
         "additionalProperties": false
       },
+      "AmendmentBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "effective_from",
+          "entered_on"
+        ],
+        "properties": {
+          "effective_from": {
+            "type": "string"
+          },
+          "entered_on": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "new_charges": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "new_end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "new_rent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AmendmentPayload": {
+        "type": "object",
+        "required": [
+          "effective_from"
+        ],
+        "properties": {
+          "charges": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "effective_from": {
+            "type": "string"
+          },
+          "new_end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "AuditActorBody": {
         "type": "object",
         "required": [
@@ -1578,6 +3244,40 @@
         },
         "additionalProperties": false
       },
+      "ContactBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ContactPayload": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "CreateInvitationPayload": {
         "type": "object",
         "required": [
@@ -1751,6 +3451,71 @@
         },
         "additionalProperties": false
       },
+      "InstallmentBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "period",
+          "due_date",
+          "due_amount",
+          "allocated_amount",
+          "remaining_amount",
+          "status",
+          "days_late",
+          "lines"
+        ],
+        "properties": {
+          "allocated_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "days_late": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "due_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineBody"
+            }
+          },
+          "period": {
+            "type": "string"
+          },
+          "remaining_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "description": "`upcoming`, `due`, `partial`, `paid` ou `late` (calculé à la lecture, R-032)."
+          }
+        }
+      },
+      "InstallmentsBody": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstallmentBody"
+            }
+          }
+        }
+      },
       "InvitationBody": {
         "type": "object",
         "required": [
@@ -1821,6 +3586,331 @@
             "items": {
               "$ref": "#/components/schemas/InvitationBody"
             }
+          }
+        }
+      },
+      "LeaseBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "unit_id",
+          "unit_reference",
+          "property_name",
+          "kind",
+          "status",
+          "start_date",
+          "rent",
+          "charges",
+          "current_rent",
+          "current_charges",
+          "due_day",
+          "due_day_defaulted",
+          "deposit_amount",
+          "vat_included",
+          "tenants",
+          "amendments",
+          "version",
+          "warnings"
+        ],
+        "properties": {
+          "activated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "amendments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmendmentBody"
+            }
+          },
+          "charges": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "current_charges": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "current_rent": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Loyer et charges en vigueur aujourd'hui (R-104)."
+          },
+          "deposit_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "due_day": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "due_day_defaulted": {
+            "type": "boolean"
+          },
+          "duration_months": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "indexation_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "description": "`residential` ou `commercial`."
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "rent": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Loyer et charges initiaux (FCFA)."
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "`draft`, `active`, `notice` ou `ended`."
+          },
+          "tenants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseTenantBody"
+            }
+          },
+          "terminated_on": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "termination_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_id": {
+            "type": "string"
+          },
+          "unit_reference": {
+            "type": "string"
+          },
+          "vat_included": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Avertissements non bloquants (`lease.deposit_above_two_months`, `lease.due_day_defaulted`)."
+          }
+        }
+      },
+      "LeasePayload": {
+        "type": "object",
+        "required": [
+          "commercial_terms"
+        ],
+        "properties": {
+          "charges": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "commercial_terms": {
+            "type": "object"
+          },
+          "deposit_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "due_day": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "end_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "primary_tenant_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "start_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`AAAA-MM-JJ`."
+          },
+          "tenant_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "unit_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vat_included": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "LeaseTenantBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "is_primary"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_primary": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LeasesBody": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeaseBody"
+            }
+          }
+        }
+      },
+      "LineBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "amount",
+          "due_date",
+          "voided"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`rent`, `charges`, `arrears` ou `exceptional`."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "void_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "voided": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LinePayload": {
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "amount",
+          "due_date"
+        ],
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`arrears` ou `exceptional`."
+          },
+          "label": {
+            "type": "string"
           }
         }
       },
@@ -1972,7 +4062,8 @@
           "identifier",
           "role",
           "status",
-          "is_self"
+          "is_self",
+          "unit_ids"
         ],
         "properties": {
           "display_name": {
@@ -1993,6 +4084,13 @@
           "status": {
             "type": "string",
             "description": "`active` ou `disabled`."
+          },
+          "unit_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Lots assignés actifs (R-081) : la portée de l'agent terrain, réglée dans S18."
           },
           "user_id": {
             "type": "string"
@@ -2021,6 +4119,18 @@
         "properties": {
           "role": {
             "type": "string"
+          }
+        }
+      },
+      "MergePayload": {
+        "type": "object",
+        "required": [
+          "into_id"
+        ],
+        "properties": {
+          "into_id": {
+            "type": "string",
+            "description": "Fiche conservée."
           }
         }
       },
@@ -2125,6 +4235,122 @@
           }
         }
       },
+      "OwnerBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "display_name",
+          "is_self",
+          "property_count",
+          "version"
+        ],
+        "properties": {
+          "archived_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_self": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "payout_method": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Réservé au gérant (et au propriétaire direct) ; absent sinon (DP-92)."
+          },
+          "property_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OwnerPayload": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payout_method": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "OwnerRefBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "OwnersPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnerBody"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "PatchOrganizationPayload": {
         "type": "object",
         "properties": {
@@ -2191,6 +4417,384 @@
         },
         "additionalProperties": false
       },
+      "PaymentContextBody": {
+        "type": "object",
+        "description": "Contexte de paiement de S04 : bail, locataires, solde, lignes ouvertes dans l'ordre d'affectation, montant proposé, seuil.",
+        "required": [
+          "lease",
+          "tenants",
+          "balance",
+          "open_lines",
+          "suggested_amount",
+          "default_method",
+          "today",
+          "confirm_threshold"
+        ],
+        "properties": {
+          "balance": {
+            "type": "object"
+          },
+          "confirm_threshold": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "default_method": {
+            "type": "string"
+          },
+          "lease": {
+            "type": "object"
+          },
+          "open_lines": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "suggested_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tenants": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "today": {
+            "type": "string"
+          }
+        }
+      },
+      "PaymentPayload": {
+        "type": "object",
+        "description": "Corps de `POST /payments` (règles : `API_CONTRACTS.md` §6.1).",
+        "required": [
+          "lease_id",
+          "amount",
+          "paid_on",
+          "payer",
+          "allocations"
+        ],
+        "properties": {
+          "acknowledge_external_ref_duplicate": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "`null` : répartition par défaut ; sinon `[{ installment_line_id, amount }]`."
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Entier FCFA, 1 à 999 999 999 (R-037)."
+          },
+          "confirm_high_amount": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "external_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lease_id": {
+            "type": "string"
+          },
+          "method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`cash`, `mobile_money`, `bank_transfer` ou `cheque`."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paid_on": {
+            "type": "string",
+            "description": "`AAAA-MM-JJ`, jamais futur (R-039)."
+          },
+          "payer": {
+            "type": "object",
+            "description": "`{ kind: \"tenant\", tenant_id }` ou `{ kind: \"third_party\", third_party_name, third_party_phone? }`."
+          },
+          "surplus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`\"advance\"` si le montant dépasse ce qui est dû aujourd'hui (R-046)."
+          }
+        }
+      },
+      "PaymentPreviewBody": {
+        "type": "object",
+        "description": "Aperçu d'affectation calculé par le serveur, sans écriture.",
+        "required": [
+          "allocations",
+          "surplus_amount",
+          "credit_amount",
+          "remaining_after",
+          "requires_surplus_confirmation",
+          "requires_high_amount_confirmation"
+        ],
+        "properties": {
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "credit_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "remaining_after": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requires_high_amount_confirmation": {
+            "type": "boolean"
+          },
+          "requires_surplus_confirmation": {
+            "type": "boolean"
+          },
+          "surplus_amount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PaymentPreviewPayload": {
+        "type": "object",
+        "description": "Corps de `POST /payments/preview`.",
+        "required": [
+          "lease_id",
+          "amount",
+          "allocations"
+        ],
+        "properties": {
+          "allocations": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lease_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PaymentRecordedBody": {
+        "type": "object",
+        "description": "Paiement enregistré : paiement, quittance numérotée, échéances touchées, avertissements.",
+        "required": [
+          "payment",
+          "receipt",
+          "installments",
+          "warnings"
+        ],
+        "properties": {
+          "installments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "payment": {
+            "type": "object"
+          },
+          "receipt": {
+            "type": "object"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PaymentsBody": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "PropertiesPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertyBody"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PropertyBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "unit_count",
+          "vacant_count",
+          "version",
+          "units"
+        ],
+        "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "archived_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_owner": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OwnerRefBody"
+              }
+            ]
+          },
+          "district": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitBody"
+            },
+            "description": "Lots du bien (fiche seulement ; vide dans une liste)."
+          },
+          "vacant_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PropertyPayload": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_owner_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "district": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "single_unit": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SingleUnitPayload",
+                "description": "Maison seule : crée aussi 1 lot (R-010) ; création seulement."
+              }
+            ]
+          }
+        }
+      },
       "ReauthPayload": {
         "type": "object",
         "required": [
@@ -2202,6 +4806,20 @@
           }
         },
         "additionalProperties": false
+      },
+      "ReceiptsBody": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
       },
       "ResetCompletePayload": {
         "type": "object",
@@ -2295,6 +4913,93 @@
           }
         }
       },
+      "SearchBody": {
+        "type": "object",
+        "required": [
+          "tenants",
+          "units",
+          "receipts"
+        ],
+        "properties": {
+          "receipts": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Vide jusqu'aux quittances (étape 08)."
+          },
+          "tenants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchTenantBody"
+            }
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchUnitBody"
+            }
+          }
+        }
+      },
+      "SearchTenantBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "display_name",
+          "unit_labels"
+        ],
+        "properties": {
+          "balance": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SearchUnitBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "property_name",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
       "SelectOrganizationPayload": {
         "type": "object",
         "required": [
@@ -2363,6 +5068,51 @@
           "version": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "SingleUnitPayload": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`house` par défaut."
+          },
+          "permitted_activity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Référence du lot ; `1` par défaut."
+          },
+          "reference_rent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "surface_m2": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "usage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`residential` par défaut."
           }
         }
       },
@@ -2475,6 +5225,207 @@
           }
         }
       },
+      "TenantBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "last_name",
+          "display_name",
+          "phone_is_whatsapp",
+          "unit_labels",
+          "version"
+        ],
+        "properties": {
+          "archived_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backup_contact": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ContactBody",
+                "description": "Absent pour le caissier, l'agent terrain, le comptable et le collaborateur (API_CONTRACTS.md §4.5)."
+              }
+            ]
+          },
+          "balance": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Solde (null jusqu'aux encaissements, étape 07)."
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "first_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "merged_into_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absent comme le contact de secours."
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone_is_whatsapp": {
+            "type": "boolean"
+          },
+          "trade_activity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unit_labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Lots du locataire (vide jusqu'aux baux, étape 06)."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "TenantPayload": {
+        "type": "object",
+        "properties": {
+          "backup_contact": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ContactPayload"
+              }
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "first_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`+226` et 8 chiffres ; formes usuelles acceptées."
+          },
+          "phone_is_whatsapp": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "trade_activity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "TenantsPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TenantBody"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "TerminatePayload": {
+        "type": "object",
+        "required": [
+          "terminated_on",
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "terminated_on": {
+            "type": "string"
+          }
+        }
+      },
       "TotpConfirmPayload": {
         "type": "object",
         "required": [
@@ -2546,10 +5497,150 @@
             "items": {
               "type": "string"
             },
-            "description": "Vide jusqu'à l'étape 05 (les lots n'existent pas encore)."
+            "description": "Lots existants et non archivés de l'organisation (étape 05) ; la liste vide retire toutes les affectations."
           }
         },
         "additionalProperties": false
+      },
+      "UnitBody": {
+        "type": "object",
+        "required": [
+          "id",
+          "property_id",
+          "property_name",
+          "reference",
+          "kind",
+          "usage",
+          "status",
+          "version"
+        ],
+        "properties": {
+          "archived_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "permitted_activity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "property_id": {
+            "type": "string"
+          },
+          "property_name": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "reference_rent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Entier FCFA."
+          },
+          "status": {
+            "type": "string",
+            "description": "`vacant`, `under_works` ou `archived`."
+          },
+          "surface_m2": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Texte décimal (« 18.50 »)."
+          },
+          "usage": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "UnitPayload": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permitted_activity": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seulement pour un lot `commercial` ou `mixed` (R-012)."
+          },
+          "property_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Création seulement : un lot ne change pas de bien."
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference_rent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Entier FCFA de 1 à 999 999 999."
+          },
+          "surface_m2": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Texte décimal, virgule ou point (« 18,5 »)."
+          },
+          "usage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UnitsPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitBody"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       },
       "UpdateMePayload": {
         "type": "object",
@@ -2582,6 +5673,28 @@
           },
           "id": {
             "type": "string"
+          }
+        }
+      },
+      "VoidPayload": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "WorksPayload": {
+        "type": "object",
+        "required": [
+          "under_works"
+        ],
+        "properties": {
+          "under_works": {
+            "type": "boolean"
           }
         }
       }

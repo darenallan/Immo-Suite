@@ -18,6 +18,13 @@
 use std::cmp::Ordering;
 use std::fmt;
 
+pub mod allocation;
+pub mod catalog;
+pub mod phone;
+pub mod receipt;
+pub mod schedule;
+pub mod words;
+
 /// Valeur absolue maximale d'un montant (DP-56) : alignée sur le montant en lettres testé (R-053).
 pub const MAX_ABS_FCFA: i64 = 999_999_999;
 const MAX_ABS_FCFA_U64: u64 = 999_999_999;

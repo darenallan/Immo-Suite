@@ -143,7 +143,7 @@ impl From<DbError> for LoginError {
     }
 }
 
-pub(super) fn internal<E: std::fmt::Display>(e: E) -> DbError {
+pub(crate) fn internal<E: std::fmt::Display>(e: E) -> DbError {
     // Les erreurs de décodage ne citent jamais de valeur.
     DbError::Query(sqlx::Error::Decode(e.to_string().into()))
 }
@@ -152,9 +152,9 @@ pub(super) fn internal<E: std::fmt::Display>(e: E) -> DbError {
 /// ils prolongent ce service sans en exposer l'intérieur à l'extérieur de `identity`.
 #[derive(Clone)]
 pub struct IdentityService {
-    pub(super) db: Db,
+    pub(crate) db: Db,
     pub(super) passwords: PasswordService,
-    pub(super) clock: Arc<dyn Clock>,
+    pub(crate) clock: Arc<dyn Clock>,
     pub(super) secret: Arc<Vec<u8>>,
     /// Clé de chiffrement des champs (secret TOTP, codes de secours). Absente : la double authentification est indisponible.
     pub(super) field_key: Option<FieldKey>,
@@ -168,21 +168,31 @@ impl std::fmt::Debug for IdentityService {
     }
 }
 
-pub(super) fn micros(t: DateTime<Utc>) -> String {
+pub(crate) fn micros(t: DateTime<Utc>) -> String {
     t.to_rfc3339()
 }
 
-pub(super) fn from_micros(value: i64) -> Result<DateTime<Utc>, DbError> {
+pub(crate) fn from_micros(value: i64) -> Result<DateTime<Utc>, DbError> {
     DateTime::from_timestamp_micros(value).ok_or_else(|| internal("heure illisible"))
 }
 
 const EPOCH_MICROS: &str = "(extract(epoch from {c}) * 1000000)::bigint";
 
-pub(super) fn at(column: &str) -> String {
+pub(crate) fn at(column: &str) -> String {
     EPOCH_MICROS.replace("{c}", column)
 }
 
 impl IdentityService {
+    /// La base, pour la page publique S26 (lecture par empreinte de jeton, `delivery::resolve_share_link`).
+    pub fn db_handle(&self) -> &Db {
+        &self.db
+    }
+
+    /// L'horloge du service (page publique : expiration d'un lien, E-12).
+    pub fn clock_handle(&self) -> &dyn Clock {
+        self.clock.as_ref()
+    }
+
     pub fn new(db: Db, passwords: PasswordService, clock: Arc<dyn Clock>, secret: Vec<u8>) -> Self {
         Self {
             db,
@@ -896,7 +906,7 @@ impl IdentityService {
     /// Chemin « introuvable » d'une ressource demandée par identifiant : si elle existe chez une autre organisation (liste blanche
     /// `cross_org_registry`, booléen seulement), écrit `security.cross_org_attempt` chez l'appelant et lève l'alerte (DP-86, R-004).
     /// Un identifiant qui n'existe nulle part ne laisse aucune trace.
-    pub(super) async fn trace_missing(
+    pub(crate) async fn trace_missing(
         &self,
         active_org: Uuid,
         user_id: Uuid,
@@ -1018,7 +1028,7 @@ fn user_row(r: &sqlx::postgres::PgRow) -> Result<UserRow, DbError> {
     })
 }
 
-pub(super) fn audit_context(user_id: Uuid, client: &ClientInfo) -> AuditContext {
+pub(crate) fn audit_context(user_id: Uuid, client: &ClientInfo) -> AuditContext {
     AuditContext {
         actor_user_id: Some(user_id),
         ip: client.ip,

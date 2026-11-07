@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | À faire |
+| Statut | Terminée le 04/11/2026 (validée par Mimis) ; fiches `specs/F07-baux.md` et `specs/F08-echeancier.md` rédigées le 04/11/2026, **à valider par Mimis avant tout code** |
 | Version / Date | 0.1 / 30/10/2026 |
 | Tranche | T1 (F07, F08) |
 | Effort | L, environ 18 JD (deux lots : 06a baux, 06b échéancier) |

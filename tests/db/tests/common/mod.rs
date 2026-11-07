@@ -37,6 +37,8 @@ pub struct Api {
     pub app: Router,
     pub svc: IdentityService,
     pub clock: Arc<TestClock>,
+    /// Stockage des fichiers du test (PDF des quittances, étape 08), dans un dossier temporaire propre au test.
+    pub files: immo_app::platform::file_store::DiskFileStore,
 }
 
 /// Mêmes comptes que `login.rs` : « Un » (+22670000011) gérant de A ; « Deux » (+22670000012) caissier de A et de B ;
@@ -78,7 +80,11 @@ pub async fn api_with(params: HashParams, min_client_version: &str, strict: bool
     let svc = IdentityService::new(app_db, passwords, clock.clone(), SECRET.to_vec()).with_field_key(Some(
         immo_app::identity::crypto::FieldKey::from_bytes(&[9_u8; 32]).unwrap(),
     ));
+    let files = immo_app::platform::file_store::DiskFileStore::new(
+        std::env::temp_dir().join("immo-test-files").join(uuid::Uuid::new_v4().to_string()),
+    );
     let state = AppState::new(vec![], "test".to_string())
+        .with_file_store(Some(files.clone()))
         .with_identity(
             svc.clone(),
             vec![ORIGIN.to_string()],
@@ -93,6 +99,7 @@ pub async fn api_with(params: HashParams, min_client_version: &str, strict: bool
         app: router(Arc::new(state)),
         svc,
         clock,
+        files,
     }
 }
 
@@ -243,4 +250,9 @@ pub async fn count(a: &Api, sql: &str) -> i64 {
 /// Jeton d'un lien « https://app.test/invitation/<jeton> ».
 pub fn token_of(url: &str) -> String {
     url.rsplit('/').next().unwrap().to_string()
+}
+
+/// Connexion du rôle de l'application (`immo_app`), pour appeler un service ou une tâche hors du routeur (étape 06).
+pub async fn app_db(a: &Api) -> Db {
+    Db::connect(&a.db.app_url, 2).await.unwrap()
 }

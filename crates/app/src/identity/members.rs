@@ -39,6 +39,8 @@ pub struct MemberView {
     pub role: Role,
     pub status: String,
     pub is_self: bool,
+    /// Lots assignés actifs (R-081 ; étape 05, sélecteur de S18).
+    pub unit_ids: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone)]
@@ -124,6 +126,13 @@ fn invitable(role: Role, org: &ActiveOrg) -> bool {
     role != Role::Owner && role.plan() == org.plan
 }
 
+fn unit_ids_of(r: &sqlx::postgres::PgRow) -> Result<Vec<Uuid>, DbError> {
+    r.get::<Vec<String>, _>(6)
+        .iter()
+        .map(|t| Uuid::parse_str(t).map_err(internal))
+        .collect()
+}
+
 fn invitation_view(r: &sqlx::postgres::PgRow) -> Result<InvitationView, DbError> {
     Ok(InvitationView {
         id: Uuid::parse_str(&r.get::<String, _>(0)).map_err(internal)?,
@@ -144,7 +153,9 @@ impl IdentityService {
         let org = org_of(auth)?;
         let mut tx = self.db.begin(org.id, auth.user.id).await?;
         let rows = sqlx::query(
-            "SELECT m.id::text, m.user_id::text, u.display_name, coalesce(u.login_phone, u.login_email), m.role, m.status \
+            "SELECT m.id::text, m.user_id::text, u.display_name, coalesce(u.login_phone, u.login_email), m.role, m.status, \
+                    coalesce((SELECT array_agg(ua.unit_id::text ORDER BY ua.unit_id) FROM unit_assignments ua \
+                               WHERE ua.user_id = m.user_id AND ua.revoked_at IS NULL), ARRAY[]::text[]) \
                FROM memberships m JOIN users u ON u.id = m.user_id ORDER BY m.status, u.display_name, m.id",
         )
         .fetch_all(tx.conn())
@@ -161,6 +172,7 @@ impl IdentityService {
                     role: Role::parse(&r.get::<String, _>(4)).ok_or_else(|| internal("rôle inconnu"))?,
                     status: r.get(5),
                     is_self: user_id == auth.user.id,
+                    unit_ids: unit_ids_of(r)?,
                 })
             })
             .collect::<Result<_, DbError>>()
@@ -189,7 +201,9 @@ impl IdentityService {
         membership_id: Uuid,
     ) -> Result<MemberView, ServiceError> {
         let r = sqlx::query(
-            "SELECT m.id::text, m.user_id::text, u.display_name, coalesce(u.login_phone, u.login_email), m.role, m.status \
+            "SELECT m.id::text, m.user_id::text, u.display_name, coalesce(u.login_phone, u.login_email), m.role, m.status, \
+                    coalesce((SELECT array_agg(ua.unit_id::text ORDER BY ua.unit_id) FROM unit_assignments ua \
+                               WHERE ua.user_id = m.user_id AND ua.revoked_at IS NULL), ARRAY[]::text[]) \
                FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.id = $1::uuid",
         )
         .bind(membership_id.to_string())
@@ -204,6 +218,7 @@ impl IdentityService {
             role: Role::parse(&r.get::<String, _>(4)).ok_or_else(|| internal("rôle inconnu"))?,
             status: r.get(5),
             is_self: user_id == auth.user.id,
+            unit_ids: unit_ids_of(&r)?,
         })
     }
 
@@ -356,8 +371,8 @@ impl IdentityService {
         Ok(view)
     }
 
-    /// `PUT /users/{membership_id}/unit-assignments` : la table `units` arrive à l'étape 05, donc seule la liste vide (retrait de
-    /// toutes les affectations) est acceptée (F02 §7.4).
+    /// `PUT /users/{membership_id}/unit-assignments` : remplace les lots assignés (F02 §7.4, R-081). Depuis l'étape 05, chaque lot
+    /// doit exister dans l'organisation et ne pas être archivé (DP-92) ; la liste vide retire toutes les affectations.
     pub async fn set_unit_assignments(
         &self,
         auth: &Authenticated,
@@ -366,8 +381,15 @@ impl IdentityService {
         client: &ClientInfo,
     ) -> Result<Vec<Uuid>, ServiceError> {
         let org = org_of(auth)?;
-        if !unit_ids.is_empty() {
-            return Err(ServiceError::Invalid("units_unavailable"));
+        let mut wanted: Vec<Uuid> = vec![];
+        for raw in unit_ids {
+            let id = Uuid::parse_str(raw.trim()).map_err(|_| ServiceError::Invalid("unit_ids"))?;
+            if !wanted.contains(&id) {
+                wanted.push(id);
+            }
+        }
+        if wanted.len() > 500 {
+            return Err(ServiceError::Invalid("unit_ids"));
         }
         let now = self.clock.now();
         let mut tx = self.db.begin(org.id, auth.user.id).await?;
@@ -384,8 +406,29 @@ impl IdentityService {
         .bind(micros(now))
         .execute(tx.conn())
         .await?;
+        if !wanted.is_empty() {
+            let ids: Vec<String> = wanted.iter().map(Uuid::to_string).collect();
+            let known: i64 =
+                sqlx::query_scalar("SELECT count(*) FROM units WHERE id = ANY($1::uuid[]) AND archived_at IS NULL")
+                    .bind(&ids)
+                    .fetch_one(tx.conn())
+                    .await?;
+            if usize::try_from(known).ok() != Some(wanted.len()) {
+                return Err(ServiceError::Invalid("unit_ids"));
+            }
+            sqlx::query(
+                "INSERT INTO unit_assignments (org_id, unit_id, user_id, assigned_by, assigned_at) \
+                 SELECT current_org_id(), u, $2::uuid, $3::uuid, $4::timestamptz FROM unnest($1::uuid[]) AS u",
+            )
+            .bind(&ids)
+            .bind(target.user_id.to_string())
+            .bind(auth.user.id.to_string())
+            .bind(micros(now))
+            .execute(tx.conn())
+            .await?;
+        }
         tx.commit().await?;
-        Ok(vec![])
+        Ok(wanted)
     }
 
     /// Filtre de portée (F02 règle 8) : l'agent terrain ne voit que ses lots non révoqués ; les autres rôles voient tout.

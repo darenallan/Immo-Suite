@@ -81,6 +81,8 @@ pub struct MemberBody {
     /// `active` ou `disabled`.
     pub status: String,
     pub is_self: bool,
+    /// Lots assignés actifs (R-081) : la portée de l'agent terrain, réglée dans S18.
+    pub unit_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -97,6 +99,7 @@ fn member_body(m: &MemberView) -> MemberBody {
         role: m.role.as_str().to_string(),
         status: m.status.clone(),
         is_self: m.is_self,
+        unit_ids: m.unit_ids.iter().map(Uuid::to_string).collect(),
     }
 }
 
@@ -109,7 +112,7 @@ pub struct ChangeRolePayload {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UnitAssignmentsPayload {
-    /// Vide jusqu'à l'étape 05 (les lots n'existent pas encore).
+    /// Lots existants et non archivés de l'organisation (étape 05) ; la liste vide retire toutes les affectations.
     pub unit_ids: Vec<String>,
 }
 

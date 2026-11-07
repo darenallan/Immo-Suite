@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | À faire |
+| Statut | En cours : fiches `specs/F09-paiements.md` et `specs/F10-numerotation-et-instantane.md` validées le 04/11/2026 (DP-96) ; terminée le 06/11/2026 (validée par Mimis) |
 | Version / Date | 0.1 / 30/10/2026 |
 | Tranche | T1 (F09 ; F10 : numérotation, instantané, aperçu) |
 | Effort | L, environ 18 JD (deux lots : 07a domaine et base, 07b API et écran S04) |

@@ -234,6 +234,260 @@ pub const ROUTES: &[RouteSpec] = &[
         path: "/api/feedback",
         access: Access::Action(Action::FeedbackCreate),
     },
+    // étape 05 : patrimoine (F04, F05, F06, DP-92)
+    RouteSpec {
+        method: "GET",
+        path: "/api/properties",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/properties",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/properties/{id}",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "PATCH",
+        path: "/api/properties/{id}",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/properties/{id}/archive",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/units",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/units",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/units/{id}",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "PATCH",
+        path: "/api/units/{id}",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/units/{id}/archive",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/tenants",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/tenants",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/tenants/{id}",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "PATCH",
+        path: "/api/tenants/{id}",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/tenants/{id}/merge",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/tenants/{id}/archive",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/tenants/{id}/id-document",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/owners",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/owners",
+        access: Access::Action(Action::MandateWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/owners/{id}",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "PATCH",
+        path: "/api/owners/{id}",
+        access: Access::Action(Action::MandateWrite),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/owners/{id}/archive",
+        access: Access::Action(Action::MandateWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/search",
+        access: Access::Action(Action::SearchUse),
+    },
+    // étape 06 : baux et échéancier (F07, F08, DP-94)
+    RouteSpec {
+        method: "GET",
+        path: "/api/leases",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/leases",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/leases/{id}",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "PATCH",
+        path: "/api/leases/{id}",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/leases/{id}/activate",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/leases/{id}/amendments",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/leases/{id}/terminate",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/leases/{id}/installments",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/leases/{id}/installment-lines",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/installment-lines/{id}/void",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/units/{id}/leases",
+        access: Access::Action(Action::CatalogRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/units/{id}/works",
+        access: Access::Action(Action::CatalogWrite),
+    },
+    // étape 07 (F09, F10, DP-96) : PUT, PATCH, DELETE d'un paiement répondent toujours 405 (R-047)
+    RouteSpec {
+        method: "GET",
+        path: "/api/leases/{id}/payment-context",
+        access: Access::Action(Action::PaymentRecord),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/leases/{id}/payments",
+        access: Access::Action(Action::PaymentRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/payments/preview",
+        access: Access::Action(Action::PaymentRecord),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/payments",
+        access: Access::Action(Action::PaymentRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/payments",
+        access: Access::Action(Action::PaymentRecord),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/payments/{id}",
+        access: Access::Action(Action::PaymentRead),
+    },
+    RouteSpec {
+        method: "PUT",
+        path: "/api/payments/{id}",
+        access: Access::Session,
+    },
+    RouteSpec {
+        method: "PATCH",
+        path: "/api/payments/{id}",
+        access: Access::Session,
+    },
+    RouteSpec {
+        method: "DELETE",
+        path: "/api/payments/{id}",
+        access: Access::Session,
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/receipts",
+        access: Access::Action(Action::PaymentRead),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/receipts/{id}",
+        access: Access::Action(Action::PaymentRead),
+    },
+    // étape 08 (F10, DP-98) : PDF en flux, envois, révocation ; les pages publiques /s/{jeton} sont hors /api
+    RouteSpec {
+        method: "GET",
+        path: "/api/receipts/{id}/pdf",
+        access: Access::Action(Action::PaymentRead),
+    },
+    RouteSpec {
+        method: "GET",
+        path: "/api/receipts/{id}/sends",
+        access: Access::Action(Action::PaymentRead),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/receipts/{id}/sends",
+        access: Access::Action(Action::ReceiptIssue),
+    },
+    RouteSpec {
+        method: "POST",
+        path: "/api/share-links/{id}/revoke",
+        access: Access::Action(Action::ReceiptIssue),
+    },
 ];
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -248,6 +502,10 @@ pub fn routes() -> Router<Arc<AppState>> {
         )
         .merge(crate::api_account::routes())
         .merge(crate::api_admin::routes())
+        .merge(crate::api_catalog::routes())
+        .merge(crate::api_lease::routes())
+        .merge(crate::api_payment::routes())
+        .merge(crate::api_receipt::routes())
 }
 
 // ───────── corps et réponses ─────────

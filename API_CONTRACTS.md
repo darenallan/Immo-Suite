@@ -226,7 +226,7 @@ Toute erreur est un `application/problem+json` (RFC 9457) :
 ```
 
 - `field` est un chemin pointé dans le corps de la requête. Toutes les erreurs de validation sont renvoyées **ensemble**, pas une par une (le front affiche le résumé en tête de formulaire, `UI_UX_DESIGN.md` Accessibilité).
-- Codes de champ : `validation.required`, `validation.too_long`, `validation.enum`, `validation.amount_positive`, `validation.amount_not_integer`, `validation.amount_out_of_range`, `validation.date_in_future`, `validation.date_order` (R-021), `validation.phone_format`, `validation.rent_positive` (R-022), `validation.rate_out_of_range` (R-015), `validation.email_format`.
+- Codes de champ : `validation.required`, `validation.too_long`, `validation.enum`, `validation.amount_positive`, `validation.amount_not_integer`, `validation.amount_out_of_range`, `validation.date_in_future`, `validation.date_order` (R-021), `validation.phone_format`, `validation.rent_positive` (R-022), `validation.rate_out_of_range` (R-015), `validation.email_format`, `validation.not_applicable` (champ qui n'existe pas pour ce type, par exemple l'activité autorisée d'un lot d'habitation, R-012, DP-92).
 - La validation du front est un confort ; le serveur valide toujours (`SECURITY.md` §7.1).
 
 ### 3.4 Catalogue des codes d'erreur stables
@@ -276,7 +276,15 @@ Les messages de la colonne « Texte du front » reprennent `UI_UX_DESIGN.md` (Mi
 | `receipt.pdf_not_ready` | 409 | « Le paiement est enregistré. La quittance n'est pas encore prête : un nouvel essai est en cours. » + [Actualiser] | R-049 |
 | `receipt.recipient_has_no_phone` | 422 | ✱ « Ce locataire n'a pas de numéro WhatsApp. Imprimez la quittance ou ajoutez un numéro. » | F10 |
 | `share_link.expired`, `share_link.revoked` | 410 | Page publique S26 « lien expiré » (texte de `UI_UX_DESIGN.md`, S26) | R-054, E-12 |
-| `tenant.phone_duplicate` | 409 | « Un locataire avec ce numéro existe déjà : {nom}. » + [Ouvrir la fiche] [Fusionner] | R-017 |
+| `tenant.phone_duplicate` | 409 | « Un locataire avec ce numéro existe déjà : {nom}. » + [Ouvrir la fiche] ; `params.conflict` = `{ id, display_name }` (DP-92 : pas de [Fusionner], la seconde fiche n'existe pas) | R-017 |
+| `tenant.archived` | 409 | ✱ « Ce locataire est archivé : sa fiche ne se modifie plus. » | R-005, DP-92 |
+| `tenant.merge_invalid` | 409 | ✱ « Ces deux fiches ne peuvent pas être fusionnées (même fiche, fiche archivée ou déjà fusionnée). » | R-017, DP-92 |
+| `property.archived` | 409 | ✱ « Ce bien est archivé : il ne se modifie plus. » | R-005, DP-92 |
+| `unit.archived` | 409 | ✱ « Ce lot est archivé : il ne se modifie plus. » | R-005, DP-92 |
+| `owner.not_found` | 422 | ✱ « Ce propriétaire n'existe pas ou est archivé. » (champ `default_owner_id`) | F05, DP-92 |
+| `owner.archived` | 409 | ✱ « Ce mandant est archivé : sa fiche ne se modifie plus. » | R-005, DP-92 |
+| `owner.has_properties` | 409 | « Ce mandant est propriétaire de {n} biens. Changez leur propriétaire avant de l'archiver. » | F05, DP-92 |
+| `owner.is_self` | 409 | ✱ « Votre propre fiche de propriétaire ne s'archive pas. » | R-016, DP-92 |
 | `unit.reference_duplicate` | 409 | ✱ « Cette référence est déjà utilisée dans ce bien. » | R-011 |
 | `unit.has_active_lease` | 409 | « Ce lot a un bail actif. Terminez le bail avant d'archiver le lot. » | R-006 |
 | `unit.under_works` | 409 | « Ce lot est en travaux. Remettez-le à « vacant » pour activer un bail. » + [Retirer « en travaux »] | R-093, E-36 |
@@ -1141,12 +1149,12 @@ Réponses de connexion et de refus **identiques** que l'identifiant existe ou no
 
 | Méthode et chemin | Droit | Corps → réponse | Erreurs propres | Règles · F · Prio |
 |---|---|---|---|---|
-| `GET /properties` | `catalog.read` | filtres `q`, `neighborhood`, `owner_id`, `archived` → liste de résumés (nom, quartier, propriétaire, nombre de lots, occupation) | | F04 · P/T1 |
-| `POST /properties` | `catalog.write` | `{ name, address, neighborhood, city, default_owner_id, single_unit? }` → bien ; `single_unit` crée **1 bien + 1 lot** (maison seule) | | R-010 · F04 · P/T1 |
+| `GET /properties` | `catalog.read` | filtres `q`, `district`, `owner_id`, `archived` → liste de résumés (nom, quartier, propriétaire, nombre de lots, lots vacants) | | F04 · P/T1 |
+| `POST /properties` | `catalog.write` | `{ name, address, district, city, default_owner_id, single_unit? { reference?, kind?, usage?, surface_m2?, reference_rent?, permitted_activity? } }` → bien ; `single_unit` crée **1 bien + 1 lot** (maison seule, référence `1` par défaut) | `owner.not_found` | R-010 · F04 · P/T1 |
 | `GET /properties/{id}`, `PATCH /properties/{id}` | `catalog.read`, `catalog.write` | fiche, `version` | `concurrency.*` | F04 · P/T1 |
 | `POST /properties/{id}/archive` | `catalog.write` | → bien archivé ; l'historique reste visible | `unit.has_active_lease` si un lot a un bail en cours | R-005, R-006 · F04 · P/T1 |
-| `GET /units` | `catalog.read` | filtres `property_id`, `neighborhood`, `usage`, `kind`, `status`, `q` → liste (référence, bien, statut dérivé, locataire, loyer, échéance du mois) | | F04 · P/T1 |
-| `POST /units` | `catalog.write` | `{ property_id, reference, kind, usage, surface, reference_rent, allowed_activity? }` → lot. Les champs dépendent du type : `allowed_activity` pour un lot commercial (R-012, DP-41) | `unit.reference_duplicate` | R-011, R-012 · F04 · P/T1 |
+| `GET /units` | `catalog.read` | filtres `property_id`, `usage`, `kind`, `status`, `q`, `archived` → liste (référence, bien, statut dérivé, locataire, loyer, échéance du mois) | | F04 · P/T1 |
+| `POST /units` | `catalog.write` | `{ property_id, reference, kind, usage, surface_m2, reference_rent, permitted_activity? }` → lot. `surface_m2` est un texte décimal (« 45.5 », jamais un flottant). `permitted_activity` seulement pour un lot commercial ou mixte (R-012, DP-41), sinon `validation.not_applicable`. Référence unique dans le bien sans tenir compte de la casse (DP-92) | `unit.reference_duplicate`, `property.archived` | R-011, R-012 · F04 · P/T1 |
 | `GET /units/{id}`, `PATCH /units/{id}` | `catalog.read`, `catalog.write` | aperçu (6.5), `version` | `concurrency.*` | F04 · P/T1 |
 | `POST /units/{id}/works` | `catalog.write` | `{ under_works: true ou false }` → lot ; audit `unit.works_set` | `unit.works_requires_vacant` | R-093 · F04 · P/T1 |
 | `POST /units/{id}/archive` | `catalog.write` | → lot archivé | `unit.has_active_lease` | R-006 · F04 · P/T1 |
@@ -1159,7 +1167,7 @@ Aucune suppression physique (R-005). La liste d'un agent terrain est filtrée su
 | Méthode et chemin | Droit | Corps → réponse | Erreurs propres | Règles · F · Prio |
 |---|---|---|---|---|
 | `GET /tenants` | `catalog.read` | filtres `q`, `has_arrears`, `archived` → liste (nom, téléphone, lots, solde) | | F06 · P/T1 |
-| `POST /tenants` | `catalog.write` | `{ kind, display_name, phones[], email, trade_activity, secondary_contact }` → locataire | `tenant.phone_duplicate` (avec `conflict`), `validation.phone_format` | R-017, R-018 · F06 · P/T1 |
+| `POST /tenants` | `catalog.write` | `{ kind, last_name, first_name, phone, phone_is_whatsapp, email, trade_activity, backup_contact { name, phone }, notes }` → locataire ; `display_name` calculé en sortie, refusé en entrée ; un seul téléphone (DP-92) | `tenant.phone_duplicate` (avec `conflict`), `validation.phone_format` | R-017, R-018 · F06 · P/T1 |
 | `GET /tenants/{id}`, `PATCH /tenants/{id}` | `catalog.read`, `catalog.write` | fiche, `version` ; champs masqués selon le rôle (4.5) | `concurrency.*`, `tenant.phone_duplicate` | F06 · P/T1 |
 | `GET /tenants/{id}/leases`, `…/payments`, `…/reminders` | `catalog.read` (+ `payment.read`, `arrears.read`) | onglets de S09 | | F06 · P/T1 |
 | `POST /tenants/{id}/merge` | `catalog.write` | `{ into_id }` → fiche conservée ; l'historique reste sur l'ancien identifiant (`merged_into_id`) ; audit `tenant.merged` | | R-017 · F06 · P/T1 |
@@ -1234,8 +1242,9 @@ La lecture publique par jeton s'appuie sur une politique par empreinte (DB §6.7
 
 | Méthode et chemin | Droit | Corps → réponse | Erreurs propres | Règles · F · Prio |
 |---|---|---|---|---|
-| `GET /owners`, `POST /owners` | `statement.read`, `mandate.write` | `{ kind, display_name, phone, payout_method }` → mandant ; dans le plan Propriétaire, une fiche `is_self` est créée avec l'organisation | | R-016 · F05 · P/T2 |
-| `GET /owners/{id}`, `PATCH /owners/{id}` | idem | fiche, `version` | `concurrency.*` | F05 · P/T2 |
+| `GET /owners`, `POST /owners` | `catalog.read`, `mandate.write` | `{ kind, display_name, phone, payout_method }` → mandant ; la liste donne nom et type à tout `catalog.read`, téléphone et mode de reversement au seul `mandate.write` (DP-92) ; dans le plan Propriétaire, une fiche `is_self` est créée avec l'organisation et `POST` répond `plan.feature_unavailable` | | R-016 · F05 · **P/T1** (fiche, étape 05) |
+| `GET /owners/{id}`, `PATCH /owners/{id}` | `catalog.read`, `mandate.write` | fiche, `version` | `concurrency.*`, `owner.archived` | F05 · P/T1 |
+| `POST /owners/{id}/archive` | `mandate.write` | → mandant archivé ; refusé tant qu'il est propriétaire par défaut d'un bien non archivé | `owner.has_properties`, `owner.is_self` | R-005 · F05 · P/T1 (DP-92) |
 | `GET /owners/{id}/payout-details` | `mandate.write` | → coordonnées de paiement **révélées**, action tracée ; chiffrées en base | | SECURITY §4.2 · F05 · P/T2 |
 | `GET /mandates`, `POST /mandates` | `mandate.write` | `{ owner_id, rate_bp, commission_base, start_date, unit_ids[] }` → mandat | `mandate.overlap` (un lot, un mandat actif), `mandate.rate_out_of_range` | R-014, R-015 · F05 · P/T2 |
 | `GET /mandates/{id}` | idem | mandat, avenants de taux, lots couverts | | F05 · P/T2 |
@@ -1407,6 +1416,12 @@ Tenu dans ce fichier jusqu'au premier changement après le pilote, puis déplac�
 | 01/11/2026 | 0.0.0 | ajout | Étape 03 (DP-88, DP-89) : implémentation de `PATCH /me`, `PUT /me/password`, `POST /me/totp`, `POST /me/totp/confirm`, `POST /auth/totp/verify`, `POST /auth/reauth`, `POST /users/{id}/password-resets`, `POST /auth/password-reset/complete`, `GET /invitations/{token}`, `POST /invitations/accept`, `PATCH /organization`, `GET/PATCH /settings`, `GET /users`, `PATCH /users/{id}`, `POST /users/{id}/disable|enable`, `PUT /users/{id}/unit-assignments`, `GET/POST /invitations`, `POST /invitations/{id}/revoke|renew`, `GET/PUT /role-settings`, `GET/POST /support-grants`, `POST /support-grants/{id}/revoke`, `GET /audit`, `PUT|PATCH|DELETE /audit/{id}` (405). `POST /auth/login` : `user` et `csrf_token` nuls et `challenge` présent quand `mfa_required` ; `GET /organization` porte `version` ; `GET /audit` : dates `AAAA-MM-JJ`, réponse `{ items[], next_cursor, meta.actors[] }` ; codes `auth.password_weak`, `auth.reset_expired`, `audit.immutable` au catalogue | — | F01 §9, F02 §7, F03 §8, F40, DP-89 |
 
 | 01/11/2026 | 0.0.0 | ajout | Étape 04 (DP-90) : `POST /api/events`, `POST /api/client-errors`, `POST /api/feedback` (+ en-tête `Idempotency-Key`) ; `rate_limit.exceeded` sur ces trois routes ; `request.too_large` sur `/events` et `/client-errors` à 8 Kio ; codes de champ `validation.too_short` et `validation.invalid` | — | F39-observation, DP-90 |
+
+| 03/11/2026 | 0.0.0 | ajout | Étape 05 (DP-92, DP-93) : `GET/POST /properties`, `GET/PATCH /properties/{id}`, `POST /properties/{id}/archive`, `GET/POST /units`, `GET/PATCH /units/{id}`, `POST /units/{id}/archive`, `GET/POST /tenants`, `GET/PATCH /tenants/{id}`, `POST /tenants/{id}/merge`, `POST /tenants/{id}/archive`, `GET /tenants/{id}/id-document` (`403 feature.disabled`), `GET/POST /owners`, `GET/PATCH /owners/{id}`, `POST /owners/{id}/archive`, `GET /search` ; noms de champs du schéma (`district`, `surface_m2`, `permitted_activity`, `last_name`, `first_name`, `phone`, `backup_contact`) ; `PUT /users/{id}/unit-assignments` accepte des lots existants ; codes `unit.archived`, `property.archived`, `tenant.archived`, `tenant.merge_invalid`, `owner.*`, `validation.not_applicable`, `request.filter_unknown` ; événement `search_performed` | — | F04, F05, F06, DP-92, DP-93 |
+
+| 04/11/2026 | 0.0.0 | ajout | Étape 06 (DP-94, DP-95) : `GET/POST /leases`, `GET/PATCH /leases/{id}`, `POST /leases/{id}/activate`, `…/amendments`, `…/terminate`, `GET /leases/{id}/installments`, `POST /leases/{id}/installment-lines`, `POST /installment-lines/{id}/void`, `GET /units/{id}/leases`, `POST /units/{id}/works` ; statut de lot `occupied` ; codes `lease.kind_not_allowed`, `lease.not_in_progress`, `lease.active_exists`, `lease.amendment_same_date`, `lease.amendment_before_start`, `lease.end_date_only_later` ; avertissements `lease.deposit_above_two_months`, `lease.due_day_defaulted` | — | F07, F08, DP-94, DP-95 |
+
+| 05/11/2026 | 0.0.0 | ajout | Étape 07 (DP-96, DP-97) : `GET /leases/{id}/payment-context`, `GET /leases/{id}/payments`, `POST /payments/preview`, `GET/POST /payments`, `GET /payments/{id}`, `PUT/PATCH/DELETE /payments/{id}` (405), `GET /receipts`, `GET /receipts/{id}` ; champ `acknowledge_external_ref_duplicate` ; codes `installment.line_has_payments`, `lease.amendment_paid_installment`, `payer.not_on_lease` | — | F09, F10, DP-96, DP-97 |
 
 Colonne « Type » : `ajout`, `modification compatible`, `dépréciation`, `retrait`, `correction de document`.
 

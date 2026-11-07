@@ -186,6 +186,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/installment-lines/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Annule une ligne d'échéance avec un motif (R-036). */
+        post: operations["void_line"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/invitations": {
         parameters: {
             query?: never;
@@ -269,6 +286,161 @@ export interface paths {
         get: operations["invitation_preview"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Baux (filtres `status`, `unit_id`, `tenant_id`) ; l'agent terrain ne voit que ceux de ses lots. */
+        get: operations["list_leases"];
+        put?: never;
+        /** Crée un bail brouillon ; les avertissements ne bloquent pas (R-024). */
+        post: operations["create_lease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leases/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fiche d'un bail. */
+        get: operations["get_lease"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Modifie un bail brouillon (`If-Match`) ; un bail activé se change par avenant. */
+        patch: operations["patch_lease"];
+        trace?: never;
+    };
+    "/api/leases/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Active un bail : échéances générées, lot occupé (R-020, R-028, R-093) ; `Idempotency-Key` : un rejeu renvoie le bail actif. */
+        post: operations["activate_lease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leases/{id}/amendments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Avenant daté, jamais rétroactif (R-023, R-104) ; une nouvelle date de fin prolonge le bail (R-091). */
+        post: operations["amend_lease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leases/{id}/installment-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ajoute un arriéré daté ou une ligne exceptionnelle (R-035, R-036). */
+        post: operations["add_line"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leases/{id}/installments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Échéancier d'un bail, lignes annulées comprises ; statut et jours de retard calculés à la lecture. */
+        get: operations["lease_installments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leases/{id}/payment-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Contexte de paiement d'un bail (S04) : un seul aller-retour (§6.1). */
+        get: operations["payment_context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leases/{id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Paiements d'un bail (onglet Paiements de S09 et S10). */
+        get: operations["lease_payments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/leases/{id}/terminate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Résilie un bail (R-030) : motif obligatoire, lot de nouveau vacant. */
+        post: operations["terminate_lease"];
         delete?: never;
         options?: never;
         head?: never;
@@ -382,6 +554,204 @@ export interface paths {
         patch: operations["patch_organization"];
         trace?: never;
     };
+    "/api/owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mandants (nom et type pour tous ; téléphone et mode de reversement pour le gérant, DP-92). */
+        get: operations["list_owners"];
+        put?: never;
+        /** Crée un mandant (gérant du plan Agence). */
+        post: operations["create_owner"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/owners/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fiche d'un mandant. */
+        get: operations["get_owner"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Modifie un mandant (`If-Match`). */
+        patch: operations["patch_owner"];
+        trace?: never;
+    };
+    "/api/owners/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive un mandant (refusé s'il est propriétaire d'un bien non archivé, ou pour la fiche du propriétaire direct). */
+        post: operations["archive_owner"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Journal des paiements (S11), du plus récent au plus ancien, 100 au plus. */
+        get: operations["list_payments"];
+        put?: never;
+        /**
+         * Encaisse un paiement et émet sa quittance (F09, F10). `Idempotency-Key` obligatoire (DP-49) ; rejeu : même réponse,
+         *     `Idempotent-Replay: true`.
+         */
+        post: operations["record_payment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aperçu d'affectation (R-043, R-044, R-046), sans écriture. */
+        post: operations["preview_payment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Un paiement : affectations et quittance. */
+        get: operations["get_payment"];
+        /** Un paiement validé est immuable (R-047, E-08) : toujours `405 payment.immutable`. */
+        put: operations["payment_immutable"];
+        post?: never;
+        /** Variante `DELETE` (documentée pour le registre). */
+        delete: operations["payment_immutable_delete"];
+        options?: never;
+        head?: never;
+        /** Variante `PATCH` (documentée pour le registre). */
+        patch: operations["payment_immutable_patch"];
+        trace?: never;
+    };
+    "/api/properties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Biens (filtres `q`, `district`, `owner_id`, `archived`) ; l'agent terrain ne voit que les biens de ses lots. */
+        get: operations["list_properties"];
+        put?: never;
+        /** Crée un bien ; `single_unit` crée aussi son lot (maison seule, R-010). */
+        post: operations["create_property"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/properties/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fiche d'un bien et ses lots. */
+        get: operations["get_property"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Modifie un bien (`If-Match`). */
+        patch: operations["patch_property"];
+        trace?: never;
+    };
+    "/api/properties/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive un bien et ses lots ; rien n'est supprimé (R-005). */
+        post: operations["archive_property"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quittances, 100 au plus (filtre `q` sur le numéro). */
+        get: operations["list_receipts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/receipts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Une quittance (S25) : instantané figé, rendu de l'écran sans calcul. */
+        get: operations["get_receipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/role-settings": {
         parameters: {
             query?: never;
@@ -393,6 +763,23 @@ export interface paths {
         get: operations["get_role_settings"];
         /** Règle un droit (`If-Match` : la version lue, 0 pour créer). Effet à la requête suivante, sans reconnexion. */
         put: operations["put_role_setting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recherche unique (`q`, 2 à 80 caractères) : locataires, lots, quittances ; huit résultats au plus par groupe. */
+        get: operations["search"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -447,6 +834,180 @@ export interface paths {
         put?: never;
         /** Retire l'accès immédiatement (confirmation du mot de passe exigée). */
         post: operations["revoke_support_grant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Locataires (filtres `q`, `archived`) ; champs masqués selon le rôle. */
+        get: operations["list_tenants"];
+        put?: never;
+        /** Crée un locataire ; un numéro déjà porté répond `409 tenant.phone_duplicate` avec la fiche existante (R-017). */
+        post: operations["create_tenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fiche d'un locataire (contact de secours et notes absents pour les rôles en lecture, §4.5). */
+        get: operations["get_tenant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Modifie un locataire (`If-Match`). */
+        patch: operations["patch_tenant"];
+        trace?: never;
+    };
+    "/api/tenants/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive un locataire ; son numéro est libéré (R-005, R-017). */
+        post: operations["archive_tenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{id}/id-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pièce d'identité : désactivée au pilote (`403 feature.disabled`, R-019). */
+        get: operations["tenant_id_document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tenants/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fusionne cette fiche dans `into_id` : elle est archivée, son historique reste attaché (R-017, DP-92). */
+        post: operations["merge_tenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lots (filtres `property_id`, `usage`, `kind`, `status`, `q`, `archived`) ; l'agent terrain ne voit que ses lots. */
+        get: operations["list_units"];
+        put?: never;
+        /** Crée un lot (référence unique dans le bien, R-011 ; champs selon l'usage, R-012). */
+        post: operations["create_unit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/units/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fiche d'un lot. */
+        get: operations["get_unit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Modifie un lot (`If-Match`) ; `property_id` n'est pas modifiable. */
+        patch: operations["patch_unit"];
+        trace?: never;
+    };
+    "/api/units/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive un lot (R-005). */
+        post: operations["archive_unit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/units/{id}/leases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Baux d'un lot (onglet Baux de S07). */
+        get: operations["unit_leases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/units/{id}/works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pose ou retire « en travaux » sur un lot vacant (R-093). */
+        post: operations["set_works"];
         delete?: never;
         options?: never;
         head?: never;
@@ -600,6 +1161,26 @@ export interface components {
             password?: string | null;
             token: string;
         };
+        AmendmentBody: {
+            effective_from: string;
+            entered_on: string;
+            id: string;
+            /** Format: int64 */
+            new_charges?: number | null;
+            new_end_date?: string | null;
+            /** Format: int64 */
+            new_rent?: number | null;
+            note?: string | null;
+        };
+        AmendmentPayload: {
+            /** Format: int64 */
+            charges?: number | null;
+            effective_from: string;
+            new_end_date?: string | null;
+            note?: string | null;
+            /** Format: int64 */
+            rent?: number | null;
+        };
         AuditActorBody: {
             kind: string;
             label?: string | null;
@@ -656,6 +1237,14 @@ export interface components {
             /** @description Écran (`S00` à `S26`). */
             screen: string;
         };
+        ContactBody: {
+            name?: string | null;
+            phone?: string | null;
+        };
+        ContactPayload: {
+            name?: string | null;
+            phone?: string | null;
+        };
         CreateInvitationPayload: {
             email?: string | null;
             /** @description Téléphone (un des deux, pas les deux). */
@@ -706,6 +1295,25 @@ export interface components {
             /** @description Texte libre de 5 à 4 000 caractères : stocké tel quel, jamais journalisé. */
             description: string;
         };
+        InstallmentBody: {
+            /** Format: int64 */
+            allocated_amount: number;
+            /** Format: int64 */
+            days_late: number;
+            /** Format: int64 */
+            due_amount: number;
+            due_date: string;
+            id: string;
+            lines: components["schemas"]["LineBody"][];
+            period: string;
+            /** Format: int64 */
+            remaining_amount: number;
+            /** @description `upcoming`, `due`, `partial`, `paid` ou `late` (calculé à la lecture, R-032). */
+            status: string;
+        };
+        InstallmentsBody: {
+            items: components["schemas"]["InstallmentBody"][];
+        };
         InvitationBody: {
             created_at: string;
             expires_at: string;
@@ -724,6 +1332,96 @@ export interface components {
         };
         InvitationsBody: {
             invitations: components["schemas"]["InvitationBody"][];
+        };
+        LeaseBody: {
+            activated_at?: string | null;
+            amendments: components["schemas"]["AmendmentBody"][];
+            /** Format: int64 */
+            charges: number;
+            /** Format: int64 */
+            current_charges: number;
+            /**
+             * Format: int64
+             * @description Loyer et charges en vigueur aujourd'hui (R-104).
+             */
+            current_rent: number;
+            /** Format: int64 */
+            deposit_amount: number;
+            /** Format: int32 */
+            due_day: number;
+            due_day_defaulted: boolean;
+            /** Format: int32 */
+            duration_months?: number | null;
+            end_date?: string | null;
+            id: string;
+            indexation_note?: string | null;
+            /** @description `residential` ou `commercial`. */
+            kind: string;
+            property_name: string;
+            /**
+             * Format: int64
+             * @description Loyer et charges initiaux (FCFA).
+             */
+            rent: number;
+            start_date: string;
+            /** @description `draft`, `active`, `notice` ou `ended`. */
+            status: string;
+            tenants: components["schemas"]["LeaseTenantBody"][];
+            terminated_on?: string | null;
+            termination_reason?: string | null;
+            unit_id: string;
+            unit_reference: string;
+            vat_included: boolean;
+            /** Format: int32 */
+            version: number;
+            /** @description Avertissements non bloquants (`lease.deposit_above_two_months`, `lease.due_day_defaulted`). */
+            warnings: string[];
+        };
+        LeasePayload: {
+            /** Format: int64 */
+            charges?: number | null;
+            commercial_terms: Record<string, never>;
+            /** Format: int64 */
+            deposit_amount?: number | null;
+            /** Format: int32 */
+            due_day?: number | null;
+            end_date?: string | null;
+            kind?: string | null;
+            primary_tenant_id?: string | null;
+            /** Format: int64 */
+            rent?: number | null;
+            /** @description `AAAA-MM-JJ`. */
+            start_date?: string | null;
+            tenant_ids?: string[] | null;
+            unit_id?: string | null;
+            vat_included?: boolean | null;
+        };
+        LeaseTenantBody: {
+            display_name: string;
+            id: string;
+            is_primary: boolean;
+        };
+        LeasesBody: {
+            items: components["schemas"]["LeaseBody"][];
+        };
+        LineBody: {
+            /** Format: int64 */
+            amount: number;
+            due_date: string;
+            id: string;
+            /** @description `rent`, `charges`, `arrears` ou `exceptional`. */
+            kind: string;
+            label?: string | null;
+            void_reason?: string | null;
+            voided: boolean;
+        };
+        LinePayload: {
+            /** Format: int64 */
+            amount: number;
+            due_date: string;
+            /** @description `arrears` ou `exceptional`. */
+            kind: string;
+            label: string;
         };
         LoginBody: {
             /** @description Absente tant que l'utilisateur de plusieurs organisations n'en a pas choisi une. */
@@ -765,6 +1463,8 @@ export interface components {
             role: string;
             /** @description `active` ou `disabled`. */
             status: string;
+            /** @description Lots assignés actifs (R-081) : la portée de l'agent terrain, réglée dans S18. */
+            unit_ids: string[];
             user_id: string;
         };
         MembersBody: {
@@ -772,6 +1472,10 @@ export interface components {
         };
         MembershipBody: {
             role: string;
+        };
+        MergePayload: {
+            /** @description Fiche conservée. */
+            into_id: string;
         };
         OrganizationBody: {
             currency: string;
@@ -802,6 +1506,34 @@ export interface components {
              */
             version: number;
         };
+        OwnerBody: {
+            archived_at?: string | null;
+            display_name: string;
+            id: string;
+            is_self: boolean;
+            kind: string;
+            payout_method?: string | null;
+            /** @description Réservé au gérant (et au propriétaire direct) ; absent sinon (DP-92). */
+            phone?: string | null;
+            /** Format: int64 */
+            property_count: number;
+            /** Format: int32 */
+            version: number;
+        };
+        OwnerPayload: {
+            display_name?: string | null;
+            kind?: string | null;
+            payout_method?: string | null;
+            phone?: string | null;
+        };
+        OwnerRefBody: {
+            display_name: string;
+            id: string;
+        };
+        OwnersPage: {
+            items: components["schemas"]["OwnerBody"][];
+            next_cursor?: string | null;
+        };
         PatchOrganizationPayload: {
             /** @description Vide : efface la ville. */
             city?: string | null;
@@ -821,8 +1553,107 @@ export interface components {
             /** Format: int64 */
             share_link_ttl_days: number;
         };
+        /** @description Contexte de paiement de S04 : bail, locataires, solde, lignes ouvertes dans l'ordre d'affectation, montant proposé, seuil. */
+        PaymentContextBody: {
+            balance: Record<string, never>;
+            /** Format: int64 */
+            confirm_threshold: number;
+            default_method: string;
+            lease: Record<string, never>;
+            open_lines: Record<string, never>[];
+            /** Format: int64 */
+            suggested_amount: number;
+            tenants: Record<string, never>[];
+            today: string;
+        };
+        /** @description Corps de `POST /payments` (règles : `API_CONTRACTS.md` §6.1). */
+        PaymentPayload: {
+            acknowledge_external_ref_duplicate?: boolean | null;
+            /** @description `null` : répartition par défaut ; sinon `[{ installment_line_id, amount }]`. */
+            allocations: Record<string, never>[];
+            /**
+             * Format: int64
+             * @description Entier FCFA, 1 à 999 999 999 (R-037).
+             */
+            amount: number;
+            confirm_high_amount?: boolean | null;
+            external_ref?: string | null;
+            lease_id: string;
+            /** @description `cash`, `mobile_money`, `bank_transfer` ou `cheque`. */
+            method?: string | null;
+            note?: string | null;
+            /** @description `AAAA-MM-JJ`, jamais futur (R-039). */
+            paid_on: string;
+            /** @description `{ kind: "tenant", tenant_id }` ou `{ kind: "third_party", third_party_name, third_party_phone? }`. */
+            payer: Record<string, never>;
+            /** @description `"advance"` si le montant dépasse ce qui est dû aujourd'hui (R-046). */
+            surplus?: string | null;
+        };
+        /** @description Aperçu d'affectation calculé par le serveur, sans écriture. */
+        PaymentPreviewBody: {
+            allocations: Record<string, never>[];
+            /** Format: int64 */
+            credit_amount: number;
+            /** Format: int64 */
+            remaining_after: number;
+            requires_high_amount_confirmation: boolean;
+            requires_surplus_confirmation: boolean;
+            /** Format: int64 */
+            surplus_amount: number;
+        };
+        /** @description Corps de `POST /payments/preview`. */
+        PaymentPreviewPayload: {
+            allocations: Record<string, never>[];
+            /** Format: int64 */
+            amount: number;
+            lease_id: string;
+        };
+        /** @description Paiement enregistré : paiement, quittance numérotée, échéances touchées, avertissements. */
+        PaymentRecordedBody: {
+            installments: Record<string, never>[];
+            payment: Record<string, never>;
+            receipt: Record<string, never>;
+            warnings: string[];
+        };
+        PaymentsBody: {
+            items: Record<string, never>[];
+        };
+        PropertiesPage: {
+            items: components["schemas"]["PropertyBody"][];
+            next_cursor?: string | null;
+        };
+        PropertyBody: {
+            address?: string | null;
+            archived_at?: string | null;
+            city?: string | null;
+            default_owner?: null | components["schemas"]["OwnerRefBody"];
+            district?: string | null;
+            id: string;
+            name: string;
+            notes?: string | null;
+            /** Format: int64 */
+            unit_count: number;
+            /** @description Lots du bien (fiche seulement ; vide dans une liste). */
+            units: components["schemas"]["UnitBody"][];
+            /** Format: int64 */
+            vacant_count: number;
+            /** Format: int32 */
+            version: number;
+        };
+        PropertyPayload: {
+            address?: string | null;
+            city?: string | null;
+            default_owner_id?: string | null;
+            district?: string | null;
+            name?: string | null;
+            notes?: string | null;
+            single_unit?: null | components["schemas"]["SingleUnitPayload"];
+        };
         ReauthPayload: {
             password: string;
+        };
+        ReceiptsBody: {
+            items: Record<string, never>[];
         };
         ResetCompletePayload: {
             new_password: string;
@@ -852,6 +1683,26 @@ export interface components {
         RoleSettingsBody: {
             settings: components["schemas"]["RoleSettingBody"][];
         };
+        SearchBody: {
+            /** @description Vide jusqu'aux quittances (étape 08). */
+            receipts: Record<string, never>[];
+            tenants: components["schemas"]["SearchTenantBody"][];
+            units: components["schemas"]["SearchUnitBody"][];
+        };
+        SearchTenantBody: {
+            /** Format: int64 */
+            balance?: number | null;
+            display_name: string;
+            id: string;
+            phone?: string | null;
+            unit_labels: string[];
+        };
+        SearchUnitBody: {
+            id: string;
+            label: string;
+            property_name: string;
+            status: string;
+        };
         SelectOrganizationPayload: {
             organization_id: string;
         };
@@ -873,6 +1724,18 @@ export interface components {
             timezone: string;
             /** Format: int32 */
             version: number;
+        };
+        SingleUnitPayload: {
+            /** @description `house` par défaut. */
+            kind?: string | null;
+            permitted_activity?: string | null;
+            /** @description Référence du lot ; `1` par défaut. */
+            reference?: string | null;
+            /** Format: int64 */
+            reference_rent?: number | null;
+            surface_m2?: string | null;
+            /** @description `residential` par défaut. */
+            usage?: string | null;
         };
         /** @description Réponse de `/health`. */
         StatusBody: {
@@ -904,6 +1767,51 @@ export interface components {
             accesses: components["schemas"]["SupportAccessBody"][];
             grants: components["schemas"]["SupportGrantBody"][];
         };
+        TenantBody: {
+            archived_at?: string | null;
+            backup_contact?: null | components["schemas"]["ContactBody"];
+            /**
+             * Format: int64
+             * @description Solde (null jusqu'aux encaissements, étape 07).
+             */
+            balance?: number | null;
+            display_name: string;
+            email?: string | null;
+            first_name?: string | null;
+            id: string;
+            kind: string;
+            last_name: string;
+            merged_into_id?: string | null;
+            /** @description Absent comme le contact de secours. */
+            notes?: string | null;
+            phone?: string | null;
+            phone_is_whatsapp: boolean;
+            trade_activity?: string | null;
+            /** @description Lots du locataire (vide jusqu'aux baux, étape 06). */
+            unit_labels: string[];
+            /** Format: int32 */
+            version: number;
+        };
+        TenantPayload: {
+            backup_contact?: null | components["schemas"]["ContactPayload"];
+            email?: string | null;
+            first_name?: string | null;
+            kind?: string | null;
+            last_name?: string | null;
+            notes?: string | null;
+            /** @description `+226` et 8 chiffres ; formes usuelles acceptées. */
+            phone?: string | null;
+            phone_is_whatsapp?: boolean | null;
+            trade_activity?: string | null;
+        };
+        TenantsPage: {
+            items: components["schemas"]["TenantBody"][];
+            next_cursor?: string | null;
+        };
+        TerminatePayload: {
+            reason: string;
+            terminated_on: string;
+        };
         TotpConfirmPayload: {
             code: string;
         };
@@ -922,8 +1830,49 @@ export interface components {
             unit_ids: string[];
         };
         UnitAssignmentsPayload: {
-            /** @description Vide jusqu'à l'étape 05 (les lots n'existent pas encore). */
+            /** @description Lots existants et non archivés de l'organisation (étape 05) ; la liste vide retire toutes les affectations. */
             unit_ids: string[];
+        };
+        UnitBody: {
+            archived_at?: string | null;
+            id: string;
+            kind: string;
+            permitted_activity?: string | null;
+            property_id: string;
+            property_name: string;
+            reference: string;
+            /**
+             * Format: int64
+             * @description Entier FCFA.
+             */
+            reference_rent?: number | null;
+            /** @description `vacant`, `under_works` ou `archived`. */
+            status: string;
+            /** @description Texte décimal (« 18.50 »). */
+            surface_m2?: string | null;
+            usage: string;
+            /** Format: int32 */
+            version: number;
+        };
+        UnitPayload: {
+            kind?: string | null;
+            /** @description Seulement pour un lot `commercial` ou `mixed` (R-012). */
+            permitted_activity?: string | null;
+            /** @description Création seulement : un lot ne change pas de bien. */
+            property_id?: string | null;
+            reference?: string | null;
+            /**
+             * Format: int64
+             * @description Entier FCFA de 1 à 999 999 999.
+             */
+            reference_rent?: number | null;
+            /** @description Texte décimal, virgule ou point (« 18,5 »). */
+            surface_m2?: string | null;
+            usage?: string | null;
+        };
+        UnitsPage: {
+            items: components["schemas"]["UnitBody"][];
+            next_cursor?: string | null;
         };
         UpdateMePayload: {
             display_name?: string | null;
@@ -933,6 +1882,12 @@ export interface components {
         UserBody: {
             display_name: string;
             id: string;
+        };
+        VoidPayload: {
+            reason: string;
+        };
+        WorksPayload: {
+            under_works: boolean;
         };
     };
     responses: never;
@@ -1339,6 +2294,32 @@ export interface operations {
             };
         };
     };
+    void_line: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidPayload"];
+            };
+        };
+        responses: {
+            /** @description Ligne annulée */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LineBody"];
+                };
+            };
+        };
+    };
     list_invitations: {
         parameters: {
             query?: never;
@@ -1543,6 +2524,306 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_leases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Baux */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeasesBody"];
+                };
+            };
+        };
+    };
+    create_lease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeasePayload"];
+            };
+        };
+        responses: {
+            /** @description Bail brouillon */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaseBody"];
+                };
+            };
+            /** @description lease.kind_not_allowed, unit.archived */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_lease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaseBody"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_lease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeasePayload"];
+            };
+        };
+        responses: {
+            /** @description Bail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaseBody"];
+                };
+            };
+            /** @description lease.not_draft */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description concurrency.version_mismatch */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    activate_lease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bail actif */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaseBody"];
+                };
+            };
+            /** @description lease.overlap, unit.under_works, lease.not_draft */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    amend_lease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmendmentPayload"];
+            };
+        };
+        responses: {
+            /** @description Bail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaseBody"];
+                };
+            };
+            /** @description lease.not_in_progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_line: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinePayload"];
+            };
+        };
+        responses: {
+            /** @description Ligne */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LineBody"];
+                };
+            };
+        };
+    };
+    lease_installments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Échéances */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallmentsBody"];
+                };
+            };
+        };
+    };
+    payment_context: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Contexte de paiement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentContextBody"];
+                };
+            };
+        };
+    };
+    lease_payments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paiements du bail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentsBody"];
+                };
+            };
+        };
+    };
+    terminate_lease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminatePayload"];
+            };
+        };
+        responses: {
+            /** @description Bail terminé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaseBody"];
+                };
             };
         };
     };
@@ -1801,6 +3082,522 @@ export interface operations {
             };
         };
     };
+    list_owners: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mandants */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnersPage"];
+                };
+            };
+        };
+    };
+    create_owner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerPayload"];
+            };
+        };
+        responses: {
+            /** @description Mandant créé */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerBody"];
+                };
+            };
+            /** @description plan.feature_unavailable */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_owner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mandant */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerBody"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_owner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerPayload"];
+            };
+        };
+        responses: {
+            /** @description Mandant */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerBody"];
+                };
+            };
+            /** @description owner.archived */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description concurrency.version_mismatch */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    archive_owner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mandant archivé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerBody"];
+                };
+            };
+            /** @description owner.has_properties, owner.is_self */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_payments: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                method?: string;
+                lease_id?: string;
+                tenant_id?: string;
+                unit_id?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paiements */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentsBody"];
+                };
+            };
+        };
+    };
+    record_payment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentPayload"];
+            };
+        };
+        responses: {
+            /** @description Paiement et quittance */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentRecordedBody"];
+                };
+            };
+            /** @description payment.external_ref_duplicate, payment.lease_not_in_progress, payment.stale_allocation */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description payment.confirmation_required, payment.surplus_not_confirmed, payment.allocation_invalid, idempotency.key_reused_with_different_body */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    preview_payment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentPreviewPayload"];
+            };
+        };
+        responses: {
+            /** @description Aperçu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPreviewBody"];
+                };
+            };
+        };
+    };
+    get_payment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paiement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    payment_immutable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description payment.immutable */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    payment_immutable_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description payment.immutable */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    payment_immutable_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description payment.immutable */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_properties: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Biens */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertiesPage"];
+                };
+            };
+        };
+    };
+    create_property: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PropertyPayload"];
+            };
+        };
+        responses: {
+            /** @description Bien créé */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertyBody"];
+                };
+            };
+            /** @description validation.failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_property: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bien */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertyBody"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_property: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PropertyPayload"];
+            };
+        };
+        responses: {
+            /** @description Bien */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertyBody"];
+                };
+            };
+            /** @description property.archived */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description concurrency.version_mismatch */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description concurrency.version_required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    archive_property: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bien archivé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PropertyBody"];
+                };
+            };
+        };
+    };
+    list_receipts: {
+        parameters: {
+            query?: {
+                q?: string;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quittances */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptsBody"];
+                };
+            };
+        };
+    };
+    get_receipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quittance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     get_role_settings: {
         parameters: {
             query?: never;
@@ -1859,6 +3656,35 @@ export interface operations {
             };
             /** @description concurrency.version_required */
             428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Résultats groupés */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchBody"];
+                };
+            };
+            /** @description validation.failed */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2005,6 +3831,405 @@ export interface operations {
             };
             /** @description resource.not_found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_tenants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Locataires */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantsPage"];
+                };
+            };
+        };
+    };
+    create_tenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantPayload"];
+            };
+        };
+        responses: {
+            /** @description Locataire créé */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantBody"];
+                };
+            };
+            /** @description tenant.phone_duplicate */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation.failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_tenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Locataire */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantBody"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_tenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantPayload"];
+            };
+        };
+        responses: {
+            /** @description Locataire */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantBody"];
+                };
+            };
+            /** @description tenant.phone_duplicate, tenant.archived */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description concurrency.version_mismatch */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    archive_tenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Locataire archivé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantBody"];
+                };
+            };
+        };
+    };
+    tenant_id_document: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description feature.disabled */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    merge_tenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergePayload"];
+            };
+        };
+        responses: {
+            /** @description Fiche conservée */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantBody"];
+                };
+            };
+            /** @description tenant.merge_invalid */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_units: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lots */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitsPage"];
+                };
+            };
+        };
+    };
+    create_unit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnitPayload"];
+            };
+        };
+        responses: {
+            /** @description Lot créé */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitBody"];
+                };
+            };
+            /** @description unit.reference_duplicate */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_unit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitBody"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    patch_unit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnitPayload"];
+            };
+        };
+        responses: {
+            /** @description Lot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitBody"];
+                };
+            };
+            /** @description unit.archived, unit.reference_duplicate */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description concurrency.version_mismatch */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    archive_unit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lot archivé */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitBody"];
+                };
+            };
+        };
+    };
+    unit_leases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Baux du lot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeasesBody"];
+                };
+            };
+        };
+    };
+    set_works: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorksPayload"];
+            };
+        };
+        responses: {
+            /** @description Lot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnitBody"];
+                };
+            };
+            /** @description unit.works_requires_vacant */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

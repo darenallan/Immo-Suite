@@ -175,6 +175,7 @@ async fn serve() -> ExitCode {
         // F39-observation : événement écarté = 422 hors production ; route d'essai jamais en production
         .with_strict_events(!production)
         .with_test_routes(!production && std::env::var("ENABLE_TEST_ROUTES").is_ok_and(|v| v == "1"));
+    let state = state.with_file_store(config.file_store_dir.clone().map(DiskFileStore::new));
     let app = http::router(Arc::new(state));
     let listener = match tokio::net::TcpListener::bind(config.bind_addr).await {
         Ok(l) => l,

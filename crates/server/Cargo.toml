@@ -20,6 +20,8 @@ path = "src/main.rs"
 
 [dependencies]
 immo-app = { path = "../app" }
+# moteur PDF (étape 08, DP-76) : utilisé seulement par le processus isolé « immo pdf-worker »
+immo-pdf = { path = "../pdf" }
 axum = "0.8"
 chrono = { version = "0.4", default-features = false }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }

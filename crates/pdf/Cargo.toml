@@ -1,0 +1,19 @@
+[package]
+name = "immo-pdf"
+version = "0.0.0"
+description = "Moteur PDF d'Immo Suite : Typst en bibliothèque, version figée (DP-76), gabarit et polices embarqués"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+immo-app = { path = "../app" }
+serde_json = "1.0.154"
+# version figée (DP-76) : l'API de Typst change d'une version à l'autre ; la monter volontairement
+typst = "=0.15.1"
+typst-layout = "=0.15.1"
+typst-pdf = "=0.15.1"

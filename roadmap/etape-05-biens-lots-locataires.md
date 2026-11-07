@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |---|---|
-| Statut | À faire |
+| Statut | Terminée le 04/11/2026 (fiches validées, DP-92 ; écarts DP-93 ; rapport `ops/rapports/ETAPE-05.md`) |
 | Version / Date | 0.1 / 30/10/2026 |
 | Tranche | T1 (F04, F06) ; T2 pour la fiche mandant (partie de F05 nécessaire à F04 et à l'import) |
 | Effort | M, environ 10 JD |

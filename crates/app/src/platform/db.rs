@@ -69,6 +69,19 @@ impl Db {
         Ok(UserTx { tx })
     }
 
+    /// Transaction de la page publique S26 (étape 08, DB §6.7, décision n° 39) : aucune organisation, aucun utilisateur, et
+    /// `app.token_hash` = empreinte hexadécimale du jeton de l'adresse ; seule la politique `share_links_by_token` rend une ligne.
+    pub async fn begin_token(&self, token_hash_hex: &str) -> Result<OrgTx, DbError> {
+        let mut tx = self.pool.begin().await?;
+        #[allow(clippy::disallowed_methods)]
+        let query = sqlx::query(
+            "SELECT set_config('app.org_id', '', true), set_config('app.user_id', '', true), set_config('app.token_hash', $1, true)",
+        )
+        .bind(token_hash_hex);
+        query.execute(&mut *tx).await?;
+        Ok(OrgTx { tx, org_id: Uuid::nil() })
+    }
+
     /// Le pool brut, pour les tests d'étanchéité qui doivent reproduire des erreurs d'usage (variante de session).
     #[doc(hidden)]
     pub fn raw_pool_for_tests(&self) -> &PgPool {

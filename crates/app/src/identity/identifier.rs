@@ -47,29 +47,9 @@ fn parse_email(text: &str) -> Option<String> {
     valid.then_some(lower)
 }
 
+/// Une seule normalisation du téléphone pour tout le produit (R-018, DP-92) : celle du domaine.
 fn parse_phone(text: &str) -> Option<String> {
-    let mut chars: String = text
-        .chars()
-        .filter(|c| !matches!(c, ' ' | '-' | '.' | '(' | ')' | '\u{a0}'))
-        .collect();
-    // « + » seulement en tête
-    let had_plus = chars.starts_with('+');
-    if had_plus {
-        chars.remove(0);
-    }
-    if !chars.chars().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
-    let local = if had_plus {
-        chars.strip_prefix("226")?
-    } else if let Some(rest) = chars.strip_prefix("00226") {
-        rest
-    } else if chars.len() == 11 {
-        chars.strip_prefix("226")?
-    } else {
-        chars.as_str()
-    };
-    (local.len() == 8).then(|| format!("+226{local}"))
+    immo_domain::phone::normalize(text)
 }
 
 #[cfg(test)]

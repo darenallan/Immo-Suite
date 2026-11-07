@@ -46,6 +46,8 @@ pub struct AppState {
     pub strict_events: bool,
     /// Route d'essai `GET /api/_test/server-error` (jamais en production, F39-observation §4).
     pub enable_test_routes: bool,
+    /// Stockage des fichiers (PDF des quittances, étape 08) ; absent : les PDF ne sont pas servis.
+    pub file_store: Option<immo_app::platform::file_store::DiskFileStore>,
 }
 
 impl AppState {
@@ -62,7 +64,14 @@ impl AppState {
             public_base_url: "http://localhost:8080".to_string(),
             strict_events: false,
             enable_test_routes: false,
+            file_store: None,
         }
+    }
+
+    /// Stockage des fichiers (`FILE_STORE_DIR`).
+    pub fn with_file_store(mut self, store: Option<immo_app::platform::file_store::DiskFileStore>) -> Self {
+        self.file_store = store;
+        self
     }
 
     /// Événements écartés : `422` (développement et essai) au lieu de `204` (production).
@@ -104,6 +113,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/health", get(health))
         .route("/ready", get(ready))
         .merge(crate::api::routes())
+        .merge(crate::api_receipt::public_routes())
         .merge(crate::api_observation::routes(state.enable_test_routes))
         .fallback(not_found)
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))

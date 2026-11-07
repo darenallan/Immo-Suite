@@ -237,8 +237,12 @@ async fn seed_rows(db: &TestDb) {
                       ('{ORG_B}', '+22670000098', 'cashier', decode(repeat('bb', 32), 'hex'), '{MB}', now() + interval '7 days');
              INSERT INTO role_settings (org_id, role, action, allowed, set_by) VALUES
                ('{ORG_A}', 'property_manager', 'record_payment', true, '{M1}'), ('{ORG_B}', 'property_manager', 'record_payment', true, '{MB}');
+             -- étape 05 : l'affectation vise un vrai lot (clé unit_assignments → units)
+             INSERT INTO properties (id, org_id, name) VALUES ('d0000000-0000-4000-8000-0000000000d1', '{ORG_A}', 'Bien d''essai');
+             INSERT INTO units (id, org_id, property_id, reference, kind, usage)
+               VALUES ('d0000000-0000-4000-8000-0000000000e1', '{ORG_A}', 'd0000000-0000-4000-8000-0000000000d1', 'A1', 'room', 'residential');
              INSERT INTO unit_assignments (org_id, unit_id, user_id, assigned_by) VALUES
-               ('{ORG_A}', gen_random_uuid(), '{CA}', '{M1}');"
+               ('{ORG_A}', 'd0000000-0000-4000-8000-0000000000e1', '{CA}', '{M1}');"
         )))
         .await
         .unwrap();

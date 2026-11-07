@@ -9,7 +9,14 @@ export type WidthClass = 'mobile' | 'tablet' | 'desktop';
 /** Les seuls événements que le front a le droit d'envoyer à l'étape 04 (liste blanche : `tests/contract/events-whitelist.json`). */
 export type ClientEvent =
   | { name: 'screen_viewed'; properties: { screen: string; width_class: WidthClass } }
-  | { name: 'validation_error'; properties: { screen: string; field: string; rule_code: string } };
+  | { name: 'validation_error'; properties: { screen: string; field: string; rule_code: string } }
+  | {
+      name: 'search_performed';
+      properties: { length: number; group: 'tenants' | 'units' | 'receipts' | 'none'; empty: 'yes' | 'no' };
+    }
+  // étape 07 (F09 règle 21) : ouverture et abandon du formulaire d'encaissement, sans aucune donnée saisie
+  | { name: 'payment_form_opened'; properties: { screen: 'S04' } }
+  | { name: 'payment_form_abandoned'; properties: { screen: 'S04' } };
 
 /** Taille maximale de la file en mémoire : au-delà, les plus anciens événements sont jetés. */
 export const MAX_QUEUE = 100;
@@ -40,7 +47,23 @@ const SCREENS: Record<string, string> = {
 };
 
 export function screenOf(path: string): string {
+  // fiches (étape 05) : l'identifiant n'entre jamais dans l'événement, seul le code de l'écran
+  if (path.startsWith('/biens/')) return 'S06';
+  if (path.startsWith('/lots/')) return 'S07';
+  if (path.startsWith('/locataires/')) return 'S09';
+  if (path.startsWith('/baux/')) return 'S10';
+  if (path.startsWith('/paiements/')) return 'S11';
   return SCREENS[path] ?? 'S00';
+}
+
+/** Recherche unique (F04 §4.1) : la longueur tapée et le groupe ouvert, jamais le texte. */
+export function trackSearch(
+  length: number,
+  group: 'tenants' | 'units' | 'receipts' | 'none',
+  empty: boolean,
+): void {
+  if (length < 2 || length > 80) return;
+  track({ name: 'search_performed', properties: { length, group, empty: empty ? 'yes' : 'no' } });
 }
 
 export function widthClass(width: number): WidthClass {

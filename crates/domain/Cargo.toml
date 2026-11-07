@@ -12,6 +12,8 @@ workspace = true
 
 [dependencies]
 thiserror = { workspace = true }
+# dates civiles seulement (étape 06) : sans la fonction « clock », le domaine ne peut pas lire l'heure (R-002, DP-50)
+chrono = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 proptest = "1"

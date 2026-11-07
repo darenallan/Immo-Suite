@@ -63,7 +63,7 @@ try {
     $env:APP_ENV = 'development'
     $env:DATABASE_URL = "postgres://immo_app:$($pw.app)@127.0.0.1:$Port/$db"
     [IO.File]::WriteAllText($passwordFile, $userPassword + "`n", (New-Object System.Text.UTF8Encoding($false)))
-    $accounts = @(@('+22670123456', 'Awa Kabore'), @('+22670123457', 'Issa Ouedraogo'), @('+22670123458', 'Compte bloque un'), @('+22670123459', 'Compte bloque deux'), @('+22670123460', 'Gerant securite un'), @('+22670123461', 'Gerant securite deux'))
+    $accounts = @(@('+22670123456', 'Awa Kabore'), @('+22670123457', 'Issa Ouedraogo'), @('+22670123458', 'Compte bloque un'), @('+22670123459', 'Compte bloque deux'), @('+22670123460', 'Gerant securite un'), @('+22670123461', 'Gerant securite deux'), @('+22670123462', 'Agent terrain'))
     foreach ($a in $accounts) {
         & $bin user create --phone $a[0] --name $a[1] --password-file $passwordFile 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "immo user create a échoué ($($a[0]))" }
@@ -74,6 +74,8 @@ try {
     Psql $db @('-c', "INSERT INTO memberships (org_id, user_id, role) SELECT o.id, u.id, 'cashier' FROM organizations o, users u WHERE o.name = 'Agence Horizon' AND u.login_phone IN ('+22670123457', '+22670123458', '+22670123459')")
     # deux autres gérants (un par largeur) pour la double authentification et l'accès support de l'étape 03 : le gérant principal reste sans TOTP
     Psql $db @('-c', "INSERT INTO memberships (org_id, user_id, role) SELECT o.id, u.id, 'manager' FROM organizations o, users u WHERE o.name = 'Agence Horizon' AND u.login_phone IN ('+22670123460', '+22670123461')")
+    # étape 05 : un agent terrain, pour la démonstration de la portée (R-081)
+    Psql $db @('-c', "INSERT INTO memberships (org_id, user_id, role) SELECT o.id, u.id, 'field_agent' FROM organizations o, users u WHERE o.name = 'Agence Horizon' AND u.login_phone = '+22670123462'")
     # la création d'un compte est refusée en production
     $env:APP_ENV = 'production'
     $env:DATABASE_URL = "postgres://immo_app:$($pw.app)@127.0.0.1:$Port/$db?sslmode=verify-full"

@@ -138,6 +138,33 @@ pub fn daily_key(job_type: &str, org_id: Option<Uuid>, clock: &dyn Clock, tz: Tz
     format!("{job_type}:{org}:{}", clock.local_date(tz))
 }
 
+/// Instant UTC d'une heure locale du jour local courant (planifier « à 02 h 00, heure de l'organisation »).
+pub fn local_time_today(clock: &dyn Clock, tz: Tz, hour: u32, minute: u32) -> DateTime<Utc> {
+    use chrono::TimeZone;
+    clock
+        .local_date(tz)
+        .and_hms_opt(hour, minute, 0)
+        .and_then(|t| tz.from_local_datetime(&t).earliest())
+        .map_or_else(|| clock.now(), |t| t.with_timezone(&Utc))
+}
+
+/// Vrai si la tâche quotidienne `job_type` du jour local (clé de `daily_key`) est terminée.
+pub async fn daily_done(
+    db: &Db,
+    clock: &dyn Clock,
+    job_type: &str,
+    org_id: Option<Uuid>,
+    tz: Tz,
+) -> Result<bool, DbError> {
+    let mut tx = db.begin_system().await?;
+    let done: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM jobs WHERE unique_key = $1 AND state = 'done')")
+        .bind(daily_key(job_type, org_id, clock, tz))
+        .fetch_one(tx.conn())
+        .await?;
+    tx.commit().await?;
+    Ok(done)
+}
+
 /// Prend la tâche suivante, ou `None`. Abandonne d'abord les tâches orphelines qui ont déjà épuisé leurs essais.
 pub async fn claim(db: &Db, clock: &dyn Clock) -> Result<Option<Job>, DbError> {
     let now = clock.now();

@@ -25,6 +25,15 @@ export type TotpEnrollment = Schemas['TotpEnrollmentBody'];
 export type ResetLink = Schemas['ResetLinkBody'];
 export type FeedbackPayload = Schemas['FeedbackPayload'];
 export type FeedbackCreated = Schemas['FeedbackCreatedBody'];
+export type Property = Schemas['PropertyBody'];
+export type Unit = Schemas['UnitBody'];
+export type Tenant = Schemas['TenantBody'];
+export type Owner = Schemas['OwnerBody'];
+export type SearchResult = Schemas['SearchBody'];
+export interface PageOf<T> {
+  items: T[];
+  next_cursor?: string | null;
+}
 
 /** Une erreur de champ (API_CONTRACTS.md §3.3). */
 export interface FieldError {
@@ -40,6 +49,8 @@ export class ApiProblem extends Error {
   readonly retryAfterSeconds: number | undefined;
   readonly reason: string | undefined;
   readonly fields: readonly FieldError[];
+  /** `params` du problème (par exemple `conflict` d'un doublon de téléphone, `count` d'un mandant propriétaire de biens). */
+  params: Record<string, unknown> = {};
 
   constructor(
     status: number,
@@ -59,6 +70,116 @@ export class ApiProblem extends Error {
     this.reason = reason;
     this.fields = fields;
   }
+}
+
+// ───────── étape 07 : paiements et quittances (corps décrits dans API_CONTRACTS.md §6.1) ─────────
+
+export interface OpenLineRow {
+  installment_id: string;
+  installment_line_id: string;
+  period: string;
+  due_date: string;
+  kind: string;
+  label: string | null;
+  remaining_amount: number;
+  status: string;
+}
+export interface PaymentContext {
+  lease: {
+    id: string;
+    status: string;
+    kind: string;
+    due_day: number;
+    unit: { id: string; label: string; property_name: string };
+  };
+  tenants: { id: string; display_name: string; is_primary: boolean; phone: string | null }[];
+  balance: { remaining_amount: number; overdue_amount: number; credit_amount: number };
+  open_lines: OpenLineRow[];
+  suggested_amount: number;
+  default_method: string;
+  today: string;
+  confirm_threshold: number;
+}
+export interface AllocationRow {
+  installment_line_id: string;
+  installment_id: string | null;
+  period: string | null;
+  due_date: string | null;
+  kind: string | null;
+  label: string | null;
+  amount: number;
+}
+export interface PaymentPreview {
+  allocations: AllocationRow[];
+  surplus_amount: number;
+  credit_amount: number;
+  remaining_after: number;
+  requires_surplus_confirmation: boolean;
+  requires_high_amount_confirmation: boolean;
+}
+export interface ReceiptSnapshot {
+  issuer: { name: string; extra_mentions: string | null };
+  receipt: { number: string; series: string; watermark: string | null; issued_on: string; issued_by: string };
+  tenants: string[];
+  payer: { kind: string; name: string | null; mention?: string };
+  unit: {
+    reference: string;
+    property_name: string;
+    address: string | null;
+    district: string | null;
+    city: string | null;
+    vat_included: boolean;
+  };
+  payment: {
+    amount: number;
+    amount_text: string;
+    amount_in_words: string;
+    paid_on: string;
+    method_label: string;
+    external_ref: string | null;
+  };
+  breakdown: {
+    period: string;
+    period_label: string;
+    lines: { kind: string; label: string; amount: number }[];
+  }[];
+  advance_amount: number;
+  remaining_after: number;
+}
+export interface ReceiptBody {
+  id: string;
+  number: string;
+  series: string;
+  status: string;
+  issued_on: string;
+  amount: number;
+  amount_in_words: string;
+  remaining_after: number;
+  advance_amount: number;
+  payment_id: string;
+  snapshot: ReceiptSnapshot;
+}
+export interface PaymentRow {
+  id: string;
+  status: string;
+  lease_id: string;
+  amount: number;
+  method: string;
+  external_ref: string | null;
+  paid_on: string;
+  recorded_at: string;
+  received_by: { id: string; display_name: string };
+  receipt_id: string | null;
+  receipt_number: string | null;
+  unit_reference: string;
+  property_name: string;
+  tenants: string | null;
+}
+export interface RecordedPayment {
+  payment: { id: string; amount: number; allocations: AllocationRow[]; unallocated_amount: number };
+  receipt: ReceiptBody;
+  installments: { id: string; period: string; status: string; remaining_amount: number }[];
+  warnings: string[];
 }
 
 interface Problem {
@@ -83,7 +204,7 @@ function asFields(value: unknown): FieldError[] {
 
 function asProblem(status: number, body: unknown): ApiProblem {
   const p: Problem = typeof body === 'object' && body !== null ? body : {};
-  return new ApiProblem(
+  const problem = new ApiProblem(
     status,
     typeof p.code === 'string' ? p.code : 'server.unexpected',
     typeof p.detail === 'string' ? p.detail : '',
@@ -92,6 +213,8 @@ function asProblem(status: number, body: unknown): ApiProblem {
     typeof p.params?.reason === 'string' ? p.params.reason : undefined,
     asFields(p.errors),
   );
+  if (typeof p.params === 'object') problem.params = p.params;
+  return problem;
 }
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -154,8 +277,11 @@ export interface AuditFilters {
   cursor?: string;
 }
 
-function query(filters: AuditFilters): string {
-  const parts = Object.entries(filters)
+function query(
+  filters:
+    AuditFilters | ListFilters | { unit_id?: string; tenant_id?: string } | { lease_id?: string; q?: string },
+): string {
+  const parts = Object.entries(filters as Record<string, string | undefined>)
     .filter(([, v]) => v !== undefined && v !== '')
     .map(([k, v]) => `${k}=${enc(String(v))}`);
   return parts.length === 0 ? '' : `?${parts.join('&')}`;
@@ -246,4 +372,94 @@ export const api = {
 
   // journal (S21)
   audit: (filters: AuditFilters) => request<AuditPage>('GET', `/api/audit${query(filters)}`),
+
+  // patrimoine (étape 05 : F04, F05, F06)
+  properties: (filters: ListFilters = {}) =>
+    request<PageOf<Property>>('GET', `/api/properties${query(filters)}`),
+  property: (id: string) => request<Property>('GET', `/api/properties/${enc(id)}`),
+  createProperty: (body: Record<string, unknown>, csrf: string) =>
+    request<Property>('POST', '/api/properties', { body, csrf }),
+  patchProperty: (id: string, body: Record<string, unknown>, version: number, csrf: string) =>
+    request<Property>('PATCH', `/api/properties/${enc(id)}`, { body, version, csrf }),
+  archiveProperty: (id: string, csrf: string) =>
+    request<Property>('POST', `/api/properties/${enc(id)}/archive`, { csrf }),
+  units: (filters: ListFilters = {}) => request<PageOf<Unit>>('GET', `/api/units${query(filters)}`),
+  unit: (id: string) => request<Unit>('GET', `/api/units/${enc(id)}`),
+  createUnit: (body: Record<string, unknown>, csrf: string) =>
+    request<Unit>('POST', '/api/units', { body, csrf }),
+  patchUnit: (id: string, body: Record<string, unknown>, version: number, csrf: string) =>
+    request<Unit>('PATCH', `/api/units/${enc(id)}`, { body, version, csrf }),
+  archiveUnit: (id: string, csrf: string) => request<Unit>('POST', `/api/units/${enc(id)}/archive`, { csrf }),
+  tenants: (filters: ListFilters = {}) => request<PageOf<Tenant>>('GET', `/api/tenants${query(filters)}`),
+  tenant: (id: string) => request<Tenant>('GET', `/api/tenants/${enc(id)}`),
+  createTenant: (body: Record<string, unknown>, csrf: string) =>
+    request<Tenant>('POST', '/api/tenants', { body, csrf }),
+  patchTenant: (id: string, body: Record<string, unknown>, version: number, csrf: string) =>
+    request<Tenant>('PATCH', `/api/tenants/${enc(id)}`, { body, version, csrf }),
+  mergeTenant: (id: string, intoId: string, csrf: string) =>
+    request<Tenant>('POST', `/api/tenants/${enc(id)}/merge`, { body: { into_id: intoId }, csrf }),
+  archiveTenant: (id: string, csrf: string) =>
+    request<Tenant>('POST', `/api/tenants/${enc(id)}/archive`, { csrf }),
+  owners: (filters: ListFilters = {}) => request<PageOf<Owner>>('GET', `/api/owners${query(filters)}`),
+  createOwner: (body: Record<string, unknown>, csrf: string) =>
+    request<Owner>('POST', '/api/owners', { body, csrf }),
+  search: (q: string) => request<SearchResult>('GET', `/api/search?q=${enc(q)}`),
+  // baux et échéancier (étape 06 : F07, F08)
+  // étape 07 (F09, F10, DP-96) : l'affectation, le statut et le montant en lettres viennent du serveur
+  paymentContext: (leaseId: string) =>
+    request<PaymentContext>('GET', `/api/leases/${enc(leaseId)}/payment-context`),
+  previewPayment: (body: Record<string, unknown>, csrf: string) =>
+    request<PaymentPreview>('POST', '/api/payments/preview', { body, csrf }),
+  recordPayment: (body: Record<string, unknown>, idempotencyKey: string, csrf: string) =>
+    request<RecordedPayment>('POST', '/api/payments', { body, csrf, idempotencyKey }),
+  payments: (filters: { lease_id?: string; q?: string } = {}) =>
+    request<{ items: PaymentRow[] }>('GET', `/api/payments${query(filters)}`),
+  payment: (id: string) =>
+    request<PaymentRow & { allocations: AllocationRow[]; receipt: ReceiptBody | null }>(
+      'GET',
+      `/api/payments/${enc(id)}`,
+    ),
+  receipt: (id: string) => request<ReceiptBody>('GET', `/api/receipts/${enc(id)}`),
+  leases: (filters: { unit_id?: string; tenant_id?: string } = {}) =>
+    request<{ items: Schemas['LeaseBody'][] }>('GET', `/api/leases${query(filters)}`),
+  addLine: (id: string, body: Record<string, unknown>, csrf: string) =>
+    request<Schemas['LineBody']>('POST', `/api/leases/${enc(id)}/installment-lines`, { body, csrf }),
+  voidLine: (id: string, reason: string, csrf: string) =>
+    request<Schemas['LineBody']>('POST', `/api/installment-lines/${enc(id)}/void`, {
+      body: { reason },
+      csrf,
+    }),
+  setWorks: (id: string, underWorks: boolean, csrf: string) =>
+    request<Unit>('POST', `/api/units/${enc(id)}/works`, { body: { under_works: underWorks }, csrf }),
+  lease: (id: string) => request<Schemas['LeaseBody']>('GET', `/api/leases/${enc(id)}`),
+  createLease: (body: Record<string, unknown>, csrf: string) =>
+    request<Schemas['LeaseBody']>('POST', '/api/leases', { body, csrf }),
+  activateLease: (id: string, csrf: string) =>
+    request<Schemas['LeaseBody']>('POST', `/api/leases/${enc(id)}/activate`, {
+      csrf,
+      idempotencyKey: crypto.randomUUID(),
+    }),
+  amendLease: (id: string, body: Record<string, unknown>, csrf: string) =>
+    request<Schemas['LeaseBody']>('POST', `/api/leases/${enc(id)}/amendments`, { body, csrf }),
+  terminateLease: (id: string, body: Record<string, unknown>, csrf: string) =>
+    request<Schemas['LeaseBody']>('POST', `/api/leases/${enc(id)}/terminate`, { body, csrf }),
+  installments: (id: string) =>
+    request<{ items: Schemas['InstallmentBody'][] }>('GET', `/api/leases/${enc(id)}/installments`),
+  setUnitAssignments: (membershipId: string, unitIds: string[], csrf: string) =>
+    request<{ unit_ids: string[] }>('PUT', `/api/users/${enc(membershipId)}/unit-assignments`, {
+      body: { unit_ids: unitIds },
+      csrf,
+    }),
 };
+
+/** Filtres d'une liste du patrimoine (API_CONTRACTS.md §2.5). */
+export interface ListFilters {
+  q?: string;
+  archived?: string;
+  district?: string;
+  owner_id?: string;
+  property_id?: string;
+  usage?: string;
+  cursor?: string;
+  limit?: string;
+}

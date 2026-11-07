@@ -629,6 +629,9 @@ Tables prévues, non créées dans cette version (T3, **[APRÈS]**) :
 **Index** (hors clés) :
 
 - `UNIQUE INDEX owners_one_self ON owners (org_id) WHERE (is_self AND (archived_at IS NULL))`
+- Contrôle `owners_self_not_archived` : `(NOT (is_self AND archived_at IS NOT NULL))` (DP-92)
+- La fiche `is_self` est créée par le déclencheur `organizations_defaults` pour une organisation du plan `owner` (comme `org_settings`, DP-89, DP-92), et par la migration de l'étape 05 pour les organisations existantes
+- Colonne générée `search_key` = `app_fold(display_name)`
 
 #### `properties`
 
@@ -657,6 +660,7 @@ Tables prévues, non créées dans cette version (T3, **[APRÈS]**) :
 
 - Clés étrangères : `(archived_by) → users(id)`, `(created_by) → users(id)`, `(org_id, default_owner_id) → owners(org_id, id)`
 - Contrôle : `((length(btrim(name)) >= 1) AND (length(btrim(name)) <= 160))`
+- Colonne générée `search_key` = `app_fold(name || ' ' || coalesce(district, '') || ' ' || coalesce(city, ''))` ; `app_fold(text)` est une fonction SQL `IMMUTABLE` (minuscules et lettres accentuées du français ramenées à leur lettre de base, sans extension, F04 §3 point 3)
 
 #### `units`
 
@@ -686,7 +690,8 @@ Tables prévues, non créées dans cette version (T3, **[APRÈS]**) :
 
 **Clés et contraintes** :
 
-- Unicité `units_org_id_property_id_reference_key` : `(org_id, property_id, reference)`
+- Unicité `units_reference_ci` : `UNIQUE INDEX (org_id, property_id, lower(btrim(reference)))`, archivés compris, sans tenir compte de la casse (DP-92 ; remplace `UNIQUE (org_id, property_id, reference)`)
+- Colonne générée `search_key` = `app_fold(reference)`, index `(org_id, search_key text_pattern_ops)` (recherche unique, F04 §4.1)
 - Clés étrangères : `(archived_by) → users(id)`, `(created_by) → users(id)`, `(org_id, property_id) → properties(org_id, id)`
 - Contrôle `units_activity_only_commercial` : `((permitted_activity IS NULL) OR (usage <> 'residential'))`
 - Contrôle : `(kind IN ('house', 'apartment', 'villa', 'studio', 'room', 'shop', 'workshop', 'warehouse', 'office', 'premises', 'other'))`
@@ -827,6 +832,8 @@ Tables prévues, non créées dans cette version (T3, **[APRÈS]**) :
 - Contrôle : `(kind IN ('person', 'company'))`
 - Contrôle : `((length(btrim(last_name)) >= 1) AND (length(btrim(last_name)) <= 120))`
 - Contrôle `tenants_merge_archives` : `((merged_into_id IS NULL) OR (archived_at IS NOT NULL))`
+- Contrôle `tenants_merge_not_self` : `(merged_into_id <> id)` (DP-92)
+- Colonne générée `search_key` = `app_fold(coalesce(first_name || ' ', '') || last_name)` (recherche unique, F06)
 - Contrôle : `(phone ~ '^\+226[0-9]{8}$')`
 - Contrôle `tenants_whatsapp_needs_phone` : `((NOT phone_is_whatsapp) OR (phone IS NOT NULL))`
 
@@ -1037,7 +1044,7 @@ Tables prévues, non créées dans cette version (T3, **[APRÈS]**) :
 **Index** (hors clés) :
 
 - `INDEX installment_lines_by_installment ON installment_lines (org_id, installment_id)`
-- `UNIQUE INDEX installment_lines_one_rent_charges ON installment_lines (org_id, installment_id, kind) WHERE (kind = ANY (ARRAY['rent', 'charges']))`
+- `UNIQUE INDEX installment_lines_one_rent_charges ON installment_lines (org_id, installment_id, kind, coalesce(amendment_id, '00000000-0000-0000-0000-000000000000')) WHERE (kind IN ('rent', 'charges'))` : une ligne de loyer et une de charges par échéance **et par version des conditions** ; un avenant annule l'ancienne ligne et ajoute la nouvelle (DP-94)
 
 **Déclencheurs** :
 

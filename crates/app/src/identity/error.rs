@@ -52,6 +52,28 @@ pub enum ServiceError {
     BadCursor,
     /// `401 auth.totp_invalid`.
     TotpInvalid,
+    /// `409` avec un code du catalogue (`unit.reference_duplicate`, `tenant.archived`…) et ses paramètres éventuels (étape 05).
+    Conflict {
+        code: &'static str,
+        params: Option<serde_json::Value>,
+    },
+    /// `403 plan.feature_unavailable` décidé par le service (plan Propriétaire, R-016).
+    PlanUnavailable,
+    /// `403 feature.disabled` (pièce d'identité au pilote, R-019).
+    FeatureDisabled,
+    /// `422` d'une règle d'argent avec un code du contrat (`payment.confirmation_required`, `payment.surplus_not_confirmed`,
+    /// `payment.allocation_invalid`, `idempotency.key_reused_with_different_body` ; étape 07, `API_CONTRACTS.md` §6.1).
+    Unprocessable {
+        code: &'static str,
+        params: Option<serde_json::Value>,
+    },
+}
+
+impl ServiceError {
+    /// Conflit sans paramètre.
+    pub fn conflict(code: &'static str) -> Self {
+        ServiceError::Conflict { code, params: None }
+    }
 }
 
 impl From<DbError> for ServiceError {

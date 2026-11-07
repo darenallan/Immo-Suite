@@ -4,7 +4,11 @@
 pub mod api;
 pub mod api_account;
 pub mod api_admin;
+pub mod api_catalog;
+pub mod api_lease;
 pub mod api_observation;
+pub mod api_payment;
+pub mod api_receipt;
 pub mod extract;
 pub mod http;
 pub mod limiter;

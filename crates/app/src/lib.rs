@@ -4,6 +4,10 @@
 //! d'organisation, interfaces PDF et e-mail). Les modules métier arrivent aux étapes suivantes.
 
 pub mod audit;
+pub mod catalog;
+pub mod delivery;
 pub mod identity;
+pub mod lease;
+pub mod ledger;
 pub mod observation;
 pub mod platform;

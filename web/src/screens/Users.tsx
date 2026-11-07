@@ -2,6 +2,7 @@ import { useEffect, useState, type SyntheticEvent } from 'react';
 import { ApiProblem, api, type Invitation, type Member } from '../api/client';
 import { ConfirmCancelled, useAuth } from '../auth';
 import { messageFor } from '../messages';
+import { UnitAssignments } from './Catalog';
 import { fr, type RoleKey } from '../texts/fr';
 
 /** Un lien à remettre : affiché une seule fois (invitation ou réinitialisation). */
@@ -176,6 +177,16 @@ export function Users({ organizationName, plan }: { organizationName: string; pl
                           ))}
                         </select>
                       </label>
+                    )}
+                    {m.status === 'active' && m.role === 'field_agent' && (
+                      <UnitAssignments
+                        membershipId={m.membership_id}
+                        name={m.display_name}
+                        assigned={m.unit_ids}
+                        onSaved={() => {
+                          setTick((t) => t + 1);
+                        }}
+                      />
                     )}
                     {m.status === 'active' ? (
                       <>

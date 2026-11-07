@@ -79,6 +79,54 @@
         "count": "int(1..1000)",
         "reason": "choice(unknown_name|bad_property|server_origin|batch_overflow)"
       }
+    },
+    {
+      "name": "search_performed",
+      "origin": "client",
+      "properties": {
+        "empty": "choice(yes|no)",
+        "group": "choice(tenants|units|receipts|none)",
+        "length": "int(2..80)"
+      }
+    },
+    {
+      "name": "payment_recorded",
+      "origin": "server",
+      "properties": {
+        "advance": "choice(yes|no)",
+        "credit": "choice(yes|no)",
+        "late_entry_days": "int(0..3650)",
+        "method": "choice(cash|mobile_money|bank_transfer|cheque)",
+        "partial": "choice(yes|no)"
+      }
+    },
+    {
+      "name": "payment_idempotent_replay",
+      "origin": "server",
+      "properties": {
+        "route": "route"
+      }
+    },
+    {
+      "name": "payment_external_ref_duplicate",
+      "origin": "server",
+      "properties": {
+        "method": "choice(cash|mobile_money|bank_transfer|cheque)"
+      }
+    },
+    {
+      "name": "payment_form_opened",
+      "origin": "client",
+      "properties": {
+        "screen": "screen"
+      }
+    },
+    {
+      "name": "payment_form_abandoned",
+      "origin": "client",
+      "properties": {
+        "screen": "screen"
+      }
     }
   ],
   "forbidden_in_values": [

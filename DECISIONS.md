@@ -1093,6 +1093,144 @@ Les entrées DP-52 à DP-68 viennent de l'audit `AUDIT_COHERENCE_2.md` (30/10/20
 - **Statut** : Prise (Claude Code dans le cadre de DP-90, 01/11/2026), **à relire par Mimis**
 - **Liens** : DP-86, DP-87, DP-90 ; F39-observation ; `ARCHITECTURE.md` §8.4.
 
+### DP-92 — Biens, lots, locataires et fiches mandants (étape 05)
+
+- **Date** : 03/11/2026
+- **Contexte** : fiches `specs/F04-biens-lots.md`, `specs/F06-fiche-locataire.md`, `specs/F05-mandants.md` (rédigées le 03/11/2026). Mimis a répondu « go la suite » : les recommandations des trois fiches (F04 §10, F06 §10, F05 §8) sont **acceptées telles qu'écrites**. Résumé pour qu'elles ne restent pas dans les fiches seules.
+- **Décision** :
+  - **Noms de champs du schéma partout** : `district`, `surface_m2`, `permitted_activity` ; locataire `last_name`, `first_name`, un seul `phone` et `phone_is_whatsapp`, `backup_contact { name, phone }`, `notes` ; `display_name` calculé en sortie. `API_CONTRACTS.md` §7.4 et §7.5 corrigés.
+  - **Lot** : référence unique dans le bien, archivés compris, **sans tenir compte de la casse** ; maison seule : référence saisie, sinon `1` ; un bien peut exister sans lot ; aucun désarchivage au pilote (bien, lot, locataire).
+  - **Locataire** : un seul téléphone ; le doublon (`tenant.phone_duplicate`) ne propose que [Ouvrir la fiche] ; la fusion est une action entre deux fiches existantes, **sans recopie** de champs ; Appeler et WhatsApp actifs dès qu'un numéro existe ; l'audit `tenant.updated` garde l'ancien et le nouveau numéro.
+  - **Décision n° 43** : téléphone du locataire unique parmi les fiches **non archivées** (prise).
+  - **Mandants** : liste lisible par `catalog.read` (nom, type ; téléphone et mode de reversement réservés à `mandate.write`) ; création, modification, archivage par le gérant (`mandate.write`) ; choix du propriétaire d'un bien par `catalog.write` ; téléphone non unique ; archivage refusé tant que le mandant est propriétaire par défaut d'un bien non archivé. Plan Propriétaire : fiche `is_self` au nom de l'organisation, créée par `create_organization()`, non archivable, modifiable par le rôle `owner` ; `POST /owners` répond `plan.feature_unavailable`.
+  - Codes d'erreur ajoutés : `unit.archived`, `property.archived`, `owner.not_found`, `owner.archived`, `owner.has_properties`, `owner.is_self`, `tenant.archived`, `tenant.merge_invalid`, `validation.not_applicable`.
+  - Événement ajouté à la liste blanche : `search_performed { length, group, empty }`, jamais le texte tapé.
+- **Alternatives écartées** : noms du contrat d'API ; plusieurs téléphones par locataire ; fusion qui complète la fiche conservée ; référence sensible à la casse ; liste des mandants réservée à `statement.read`.
+- **Conséquences** : `API_CONTRACTS.md` (§7.4, §7.5, §7.8, catalogue des erreurs, journal des changements), `DATABASE_SCHEMA.md` (`units`, `tenants`, `owners`, `create_organization()`) ; la modification de `create_organization()` s'ajoute au second avis C-19.
+- **Statut** : Prise (Mimis, 03/11/2026)
+- **Liens** : F04, F05, F06 ; R-005, R-010 à R-012, R-016 à R-019, R-081, R-094 ; DP-41, DP-58, DP-85, DP-89 ; décisions n° 43 et 64.
+
+### DP-93 — Écarts d'implémentation de l'étape 05 (à relire par Mimis)
+
+- **Date** : 03/11/2026
+- **Contexte** : en écrivant le code et les tests de l'étape 05 (F04, F05, F06, DP-92), des détails que les fiches ne tranchent pas, ou qu'elles formulent autrement que le code, sont apparus. Chacun est consigné ici avec son motif.
+- **Décision** (choix de Claude Code dans le cadre de DP-92 ; **à relire**) :
+  - **Fiche `is_self` par déclencheur** : `organizations_defaults()` (étape 03, DP-89) la crée pour le plan `owner`, au lieu de modifier `create_organization()` ; les insertions directes des essais donnent ainsi le même résultat. La garde touchée reste au second avis C-19.
+  - **`unit_assignments → units`** : la clé composite est posée `NOT VALID` (contrôlée pour toute nouvelle ligne, pas pour les lignes révoquées anciennes, qui visaient des lots inexistants) ; la migration révoque les affectations restées actives. Les jeux d'essai des étapes 03 créent désormais de vrais lots.
+  - **Plan Propriétaire** : la fiche `is_self` ne se modifie pas par l'API à l'étape 05 (`PATCH /owners` exige `mandate.write`, indisponible dans ce plan) ; son nom est celui de l'organisation à la création et ne suit pas un renommage. F05 règle 4 prévoyait la modification par le rôle `owner` : à reprendre avec l'écran des mandants (étape 16).
+  - **Pagination** : curseur opaque en hexadécimal (clé de tri et identifiant), non signé, comme celui du journal d'audit ; `API_CONTRACTS.md` §2.5 le veut signé et lié au contexte : dette commune aux listes, à solder avant le pilote. Tri unique par nom (paramètre `sort` non accepté).
+  - **Champ inconnu** : `422 request.unknown_field`, comme le contrat (§2 et §7.15) et le code existant ; les fiches F04 et F06 écrivaient `400` et ont été corrigées.
+  - **`GET /tenants/{id}/id-document`** répond `403 feature.disabled` sans lire la fiche (rien n'est révélable au pilote).
+  - **Réponses** : `ETag` sur chaque fiche ; `owners` porte `property_count` ; `tenants` porte `unit_labels: []` et `balance: null` jusqu'aux étapes 06 et 07 ; la recherche trouve aussi les lots par le nom de leur bien.
+  - **Audit** : `tenant.created` garde le type et le numéro ; les notes modifiées sont signalées sans leur texte ; `unit.archived` est écrit pour chaque lot d'un bien archivé.
+  - **Lots assignés (S18)** : `GET /users` renvoie `unit_ids` (lots assignés actifs) pour pré-cocher le sélecteur, au lieu d'une route de lecture de plus ; le sélecteur n'apparaît que pour un agent terrain ; la pile de démonstration a un compte d'agent terrain (`+22670123462`).
+  - **Non livré** : la mesure du budget de 150 ms de la recherche sur 500 lots.
+- **Alternatives écartées** : modifier `create_organization()` (les insertions directes n'auraient pas de fiche) ; valider la clé des affectations en supprimant les anciennes lignes (rien ne se supprime).
+- **Conséquences** : `API_CONTRACTS.md` §9 (journal des changements) ; second avis C-19 : `organizations_defaults()` ; dettes ajoutées au tableau de `ROADMAP.md` §4.
+- **Statut** : Prise (Claude Code dans le cadre de DP-92, 03/11/2026), **à relire par Mimis**
+- **Liens** : DP-89, DP-92 ; F04, F05, F06.
+
+### DP-94 — Baux et échéancier (étape 06)
+
+- **Date** : 04/11/2026
+- **Contexte** : fiches `specs/F07-baux.md` et `specs/F08-echeancier.md` (rédigées le 04/11/2026). Mimis a répondu « applique les recommandation » : les recommandations de F07 §10 et F08 §10 sont **acceptées telles qu'écrites**.
+- **Décision** :
+  - **Type du bail et usage du lot** : lot `residential` → bail d'habitation seulement ; lot `commercial` → bail commercial seulement ; lot `mixed` → l'un ou l'autre (`lease.kind_not_allowed` sinon).
+  - **Locataire principal** : celui désigné, sinon le premier de la liste.
+  - **Dépôt « supérieur à deux mois »** (R-024) : dépôt > 2 × loyer, charges exclues ; avertissement non bloquant, bail d'habitation seulement.
+  - **Garde « avenant sur une échéance payée »** : posée à l'étape 07 avec les affectations ; à l'étape 06, la garde vérifie le statut du bail et une date d'effet postérieure au début.
+  - **Avenant sur une échéance déjà générée et non échue** : la ligne de loyer (ou de charges) est annulée avec le motif « avenant du JJ/MM/AAAA » et une ligne au nouveau montant est ajoutée, dans la transaction de l'avenant ; l'index `installment_lines_one_rent_charges` devient unique par échéance, type **et version** (`amendment_id`).
+  - **Dernière période** : le mois qui contient la fin effective du bail est dû en entier ; aucune échéance après.
+  - **Échéance à dû nul** (toutes ses lignes annulées) : statut « payée », affichée « Annulée ».
+  - **Génération quotidienne** : 00 h 05 au fuseau de l'organisation ; alerte `installments.generation_late` si aucune génération réussie avant 02 h 00.
+  - Les règles R-098, R-099, R-100 et R-104 restent [à confirmer avec l'agence pilote à la découverte].
+- **Alternatives écartées** : bail de type libre ; dépôt comparé à loyer et charges ; fenêtre de génération à 0 jour ; prorata du dernier mois ; échéance à dû nul masquée.
+- **Conséquences** : `DATABASE_SCHEMA.md` (index des lignes, tables de l'étape) ; `API_CONTRACTS.md` (codes `lease.kind_not_allowed`, `lease.not_in_progress`, `lease.active_exists`, avertissement `lease.due_day_defaulted`) ; second avis C-19 : contrainte d'exclusion et gardes des baux.
+- **Statut** : Prise (Mimis, 04/11/2026)
+- **Liens** : F07, F08 ; R-020 à R-036, R-090 à R-095, R-098 à R-100, R-104 ; DP-24, DP-25, DP-27, DP-58 ; décisions n° 33, 41, 42.
+
+### DP-95 — Écarts d'implémentation de l'étape 06 (à relire par Mimis)
+
+- **Date** : 04/11/2026
+- **Contexte** : code et tests de l'étape 06 (F07, F08, DP-94) ; détails que les fiches ne tranchent pas.
+- **Décision** (choix de Claude Code dans le cadre de DP-94 ; **à relire**) :
+  - **R-104, lecture retenue** : un avenant vaut pour une échéance dont la date est **atteinte** par sa date d'effet (« à partir du », ≥) et **strictement postérieure** à sa date de saisie ; sinon un avenant « à partir du 01/04 » ne vaudrait pas pour un loyer dû le 1er. E-02 et E-44 sont vérifiés.
+  - **Dates civiles dans le domaine** : `chrono` sans la fonction « clock » (le domaine ne peut toujours pas lire l'heure).
+  - **Génération quotidienne** : tâche globale `installments.generate` (une par jour local) ; les organisations ayant un bail en cours sont données par une fonction `SECURITY DEFINER` (`orgs_with_leases_in_progress()`, identifiants seulement), puis la génération se fait dans un `OrgTx` par organisation ; un échec est journalisé et la tâche réessayée. **Alerte de 02 h 00** : tâche quotidienne `installments.check_late` planifiée à 02 h 00 locale (ou 5 minutes après le démarrage d'un travailleur lancé plus tard) ; si la génération du jour n'est pas `done`, alerte `installments.generation_late` au journal et dans `platform_events` (si `PLATFORM_DATABASE_URL`).
+  - **Activation rejouée** : sans table des clés d'idempotence, une activation qui porte `Idempotency-Key` sur un bail déjà actif renvoie le bail (aucune échéance de plus) ; sans clé : `lease.not_draft`.
+  - **Résiliation** : les lignes des échéances déjà générées au-delà du mois de résiliation sont annulées avec le motif « résiliation du JJ/MM/AAAA ».
+  - **`PATCH /leases/{id}`** (brouillon) : dates, loyer, charges, jour d'échéance, dépôt ; ni le lot, ni les locataires, ni le type (créer un nouveau brouillon).
+  - **`GET /leases`** : 200 baux au plus, sans curseur (dette commune aux listes).
+  - **`app_now()`** sert au statut « occupé » d'un lot (SQL) ; les tests la redéfinissent à l'heure de l'horloge du service.
+  - **Front** : S10 avec création en trois étapes (lot et locataires avec colocation et principal ; conditions ; vérification, [Enregistrer le brouillon] [Activer]), fiche (échéancier et badges, avenants, lignes d'arriéré et exceptionnelles avec annulation, avenant de loyer, résiliation), onglets Baux de S07 et S09, bouton « Mettre en travaux ». Les avertissements (dépôt, jour par défaut) s'affichent sur la fiche après l'enregistrement, pas à l'étape 3 (le front ne calcule pas la règle). **Activation refusée après création** (chevauchement, lot en travaux) : le brouillon est gardé et un nouvel essai l'active, sans second bail. Pas encore : champs commerciaux détaillés (`commercial_terms`) dans l'assistant (seul « TVA comprise »), modale de résiliation, recherche de locataire dans l'assistant (liste de 100).
+  - **Chevauchement d'un brouillon** : un brouillon qui chevauche un bail s'enregistre ; le refus vient à l'activation (l'exclusion porte sur `active`, `notice`, `ended`, F07).
+- **Conséquences** : second avis C-19 : exclusion `leases_no_overlap`, `leases_guard`, `units_works_guard`, `orgs_with_leases_in_progress()`.
+- **Statut** : Prise (Claude Code dans le cadre de DP-94, 04/11/2026) ; étape validée par Mimis le 04/11/2026, détails des écarts **à relire**
+- **Liens** : DP-94 ; F07, F08.
+
+### DP-96 — Encaisser : recommandations de F09 et F10 (étape 07)
+
+- **Date** : 04/11/2026
+- **Contexte** : fiches `specs/F09-paiements.md` (§10, 10 questions) et `specs/F10-numerotation-et-instantane.md` (§9, 5 questions) ; décision n° 37 ouverte.
+- **Décision** (recommandations validées par Mimis le 04/11/2026) :
+  - **n° 37** : contrôles des affectations en base, différés en fin de transaction (`chk_allocation`), sous le verrou consultatif du bail (`hashtextextended(lease_id::text, 0)`, même clé que le service), en plus des contrôles du code ; niveau `READ COMMITTED` exigé et vérifié par un test.
+  - **Seuil** : 1 000 000 FCFA par défaut (`payment_confirm_threshold`, réglable), confirmation au-dessus, strictement.
+  - **Excédent** : il remplit les échéances futures déjà générées dans l'ordre d'affectation ; le reste est le crédit du bail.
+  - **Crédit à la génération** : affectation « système » (`created_by` nul) portant le paiement d'origine, le plus ancien d'abord ; aucune nouvelle quittance.
+  - **Bail** : paiement accepté pour `active` et `notice`, refusé pour `draft` et `ended` (`payment.lease_not_in_progress`).
+  - **Doublon de référence** : comparaison sans casse ni espaces, par mode, sur toute l'organisation, sans limite de durée ; réutilisation après contre-passation à l'étape 09.
+  - **Ordre à date égale** : loyer, charges, exceptionnelles, arriérés, puis identifiant.
+  - **Date antérieure au début du bail** : acceptée.
+  - **PDF** : aucune tâche `render_receipt` à l'étape 07 ; `pdf.state = pending` ; l'étape 08 rendra les quittances sans fichier par une reprise unique.
+  - **Mesure des 30 secondes** : préliminaire sur Chrome en émulation de téléphone et « 4G lente » si le téléphone de test (C-13) manque ; mesure officielle à l'étape 13.
+  - **Numéro d'essai** : `ESSAI-{préfixe}-{année}-{séquence}`.
+  - **Montant en lettres** : « un franc CFA » pour 1, « de francs CFA » après un nombre exact de millions [À VÉRIFIER AVEC UN JURISTE avec R-053].
+  - **Solde restant de la quittance** : reste dû du bail sur les échéances échues ou dues à la date d'émission, après le paiement.
+  - **Mentions de l'émetteur** : copiées de `org_settings` à l'émission ; mentions obligatoires (C-08) à l'étape 08.
+  - **Contrôle des trous** : tâche quotidienne `receipts.check_gaps` à 03 h 00 locale, alerte S1 au journal et dans `platform_events`, sans blocage.
+- **Conséquences** : décision n° 37 prise ; second avis C-19 élargi aux gardes de l'étape 07 (compteur, affectations).
+- **Statut** : Prise (Mimis, 04/11/2026)
+- **Liens** : F09, F10 ; DP-13, DP-20, DP-21, DP-22, DP-37, DP-46, DP-49, DP-61, DP-64 ; n° 37.
+
+### DP-97 — Écarts d'implémentation de l'étape 07 (à relire par Mimis)
+
+- **Date** : 05/11/2026
+- **Contexte** : code et tests de l'étape 07 (F09, F10, DP-96) ; détails que les fiches ne tranchent pas.
+- **Décision** (choix de Claude Code dans le cadre de DP-96 ; **à relire**) :
+  - **Avance** = part du paiement qui ne sert pas une ligne échue ou due **aujourd'hui** ; elle exige `surplus: "advance"` même si elle remplit une échéance future déjà générée (E-06). Le « solde restant » de la quittance porte sur ces mêmes lignes.
+  - **Crédit à la génération** : appliqué à toutes les lignes ouvertes du bail après une création d'échéances (dans l'ordre R-087), donc aussi à un arriéré saisi plus tard ; affectations système, paiement le plus ancien d'abord.
+  - **Erreurs** : nouvelle variante de service `Unprocessable` (422) pour `payment.confirmation_required`, `payment.surplus_not_confirmed`, `payment.allocation_invalid`, `idempotency.key_reused_with_different_body` ; `400 idempotency.key_missing` ; `405 payment.immutable` (routes `PUT`, `PATCH`, `DELETE` au registre, accès « session »).
+  - **Idempotence** : verrou consultatif sur `(organisation, clé)` avant la lecture de la clé ; empreinte SHA-256 de la route et du corps (clés triées) ; purge quotidienne `idempotency.purge` dans les organisations qui ont un bail en cours.
+  - **Contrat OpenAPI** : les corps de paiement et de quittance sont décrits comme objets (`Object`) ; le détail est dans `API_CONTRACTS.md` §6.1 et les types du front (`web/src/api/client.ts`) sont écrits à la main.
+  - **Listes** : `GET /payments` et `GET /receipts` : 100 au plus, sans curseur (même dette que les baux).
+  - **Lecture des quittances** : droit `payment.read` (le contrat dit « `receipt.issue` ou lecture »).
+  - **Événement `payment_recorded`** : mode, partiel, avance, crédit, retard de saisie ; la durée depuis l'ouverture du formulaire et le nombre d'essais n'y sont pas (le serveur ne les connaît pas). Les événements sans propriété portent `screen` (S04) ou `route`.
+  - **S04** : choix du bail dans la liste des baux en cours filtrée à l'écran (pas encore la recherche unique) ; aperçu d'affectation affiché mais pas modifiable ligne par ligne (l'API l'accepte) ; onglet Paiements de S09 pas fait.
+  - **Résiliation** : un bail dont une échéance future porte une avance ne se résilie plus (`installment.line_has_payments`) ; à régler à l'étape 21.
+  - **Concurrence** : 4 × 10 validations sur le poste (au lieu de 4 × 50) ; 20 × 500 la nuit et 10 000 cas de propriétés : pas de CI ; budget de 300 ms et mesure des 30 secondes : non mesurés.
+- **Conséquences** : second avis C-19 sur la migration `202611061000_payments.sql` (gardes, compteur, contrôles différés).
+- **Statut** : Prise (Claude Code dans le cadre de DP-96, 05/11/2026) ; étape validée par Mimis le 06/11/2026, détails des écarts **à relire**
+- **Liens** : DP-96 ; F09, F10.
+
+### DP-98 — Quittance PDF et partage : recommandations de la fiche (étape 08)
+
+- **Date** : 06/11/2026
+- **Contexte** : fiche `specs/F10-quittance-pdf-et-partage.md` (§10, 10 questions) ; décisions n° 39, 68 et 83 ouvertes ; contenus C-04, C-06, C-08 non livrés.
+- **Décision** (recommandations validées par Mimis le 06/11/2026) :
+  - **Contenus** : développer avec les mentions de R-052 et les mentions complémentaires de Paramètres ; le critère 8 de l'étape (validation de l'agence candidate, PP-27) reste **ouvert** jusqu'à C-08, C-04, C-06 ou l'acceptation écrite du risque (DP-62).
+  - **n° 83** : contrôles automatiques sur les 20 cas types (une page, texte égal à l'instantané, polices embarquées, aucune métadonnée d'auteur, aucune référence externe, aucun pixel coloré, empreinte stable) ; planche PNG de référence par format approuvée une fois par Mimis, puis protégée par l'empreinte SHA-256 du PDF.
+  - **n° 39** : lecture publique par empreinte de jeton (`app.token_hash`), aucun rôle `BYPASSRLS`.
+  - **n° 68** : PDF servis en flux par l'API au pilote.
+  - **Message WhatsApp** : « Bonjour {nom}, voici votre quittance n° {numéro} pour {montant} (loyer de {mois}) : {lien} — {agence}, {téléphone de l'agence} » ; destinataire : locataire principal ; envoi consigné à la confirmation.
+  - **Instantané v2** : `issuer.kind` pour le filigrane « DÉMONSTRATION — sans valeur » ; les quittances v1 restent telles quelles.
+  - **Logo et signature** à cette étape (PNG ou JPEG, 200 Ko, réencodés côté serveur sans métadonnées).
+  - **Impression** depuis le PDF ; l'aperçu HTML reste pour l'écran et la page publique.
+  - **Alerte** `receipt.pdf_missing` (S2) : contrôle toutes les 5 minutes, quittance sans ses deux PDF 10 minutes après émission.
+  - **Jeton** de 256 bits (base64url, 43 caractères).
+- **Conséquences** : décisions n° 39, 68 et 83 prises ; second avis C-19 sur la politique de lecture publique.
+- **Statut** : Prise (Mimis, 06/11/2026)
+- **Liens** : F10 ; DP-33, DP-62, DP-64, DP-76, DP-96 ; n° 39, 68, 83.
+
 ## Décisions ouvertes
 
 Les 15 décisions de la section 26 du dossier, plus trois ajoutées hors dossier (n° 16 à 18). La colonne « Recommandation du dossier » n'est **pas** une décision. Sont prises : n° 1 (DP-28, puis DP-34, puis DP-52 et DP-53), 2, 4, 6, 7 (DP-76), 8, 9, 10, 14, 16, 18, 19, 20, 21, 23, 25, 27, 30, 31, 32, 34, 35, 36, 40, 41, 46 (confirmée, DP-78), 50, 51, 55, 60, 61, 62, 64, 67, 69, 70, 73 à 77, 79, 80 et 87 (voir la colonne Statut). Les autres sont **Ouvertes**. Prises ensuite (étape 01) : n° 24, 53, 95 (DP-82) et n° 88, 89, 92 (DP-83).
@@ -1135,13 +1273,13 @@ Les 15 décisions de la section 26 du dossier, plus trois ajoutées hors dossier
 | 34 | Écriture seule à deux barrières (ajoutée le 30/10/2026) | Privilèges seuls ; privilèges et déclencheur | `DATABASE_SCHEMA.md` §4.2 : privilèges et déclencheur sur 25 tables, exceptions par deux fonctions. Précise DP-47 | Avant la migration initiale | **Prise le 30/10/2026 (DP-56)** |
 | 35 | Bornes des montants (ajoutée le 30/10/2026) | Sans borne ; 1 à 999 999 999 | `DATABASE_SCHEMA.md` §1.2 : borne alignée sur le montant en lettres testé | Avant la migration initiale | **Prise le 30/10/2026 (DP-56)** |
 | 36 | Numérotation : séries d'essai et officielle, année (ajoutée le 30/10/2026) | Série unique et purge ; deux séries ; année d'émission ou année du paiement | `DATABASE_SCHEMA.md` §4.3 : deux séries (`trial`, `official`), année d'émission. Lié à la n° 25 | Avant le premier pilote | **Prise le 30/10/2026 (DP-61)** |
-| 37 | Contrôles différés des affectations (ajoutée le 30/10/2026) | Contrôle dans le code seulement ; contrôles différés sous verrou du bail | `DATABASE_SCHEMA.md` §4.5 : contrôles différés, niveau `READ COMMITTED` exigé | Avant le premier pilote | Ouverte |
+| 37 | Contrôles différés des affectations (ajoutée le 30/10/2026) | Contrôle dans le code seulement ; contrôles différés sous verrou du bail | `DATABASE_SCHEMA.md` §4.5 : contrôles différés, niveau `READ COMMITTED` exigé | Avant le premier pilote | **Prise le 04/11/2026 (DP-96)** : contrôles différés sous verrou du bail, `READ COMMITTED` |
 | 38 | Accès support : politique d'isolation dédiée (ajoutée le 30/10/2026) | Contrôle dans la console seulement ; politique de la base sous accord du client | `DATABASE_SCHEMA.md` §6.6 : politique dédiée, accord de 7 jours au plus | Avant le premier pilote | Ouverte |
-| 39 | Lecture publique par jeton (ajoutée le 30/10/2026) | Politique par empreinte de jeton ; fonction à rôle contournant la RLS | `DATABASE_SCHEMA.md` §6.7 : politique par jeton, aucun rôle `BYPASSRLS` pour l'application | Tranche 3 | Ouverte |
+| 39 | Lecture publique par jeton (ajoutée le 30/10/2026) | Politique par empreinte de jeton ; fonction à rôle contournant la RLS | `DATABASE_SCHEMA.md` §6.7 : politique par jeton, aucun rôle `BYPASSRLS` pour l'application | Tranche 3 | **Prise le 06/11/2026 (DP-98)** : politique par empreinte de jeton |
 | 40 | Annulation d'import et purge par fonctions (ajoutée le 30/10/2026) | Fonctions à droits du propriétaire ; `DELETE` accordé à l'application ; archivage seulement | `DATABASE_SCHEMA.md` §4.2 : deux fonctions `SECURITY DEFINER`, exception encadrée à R-005 | Avant le premier pilote | **Prise le 30/10/2026 (DP-60)** |
 | 41 | Chevauchement de baux avec les baux terminés (ajoutée le 30/10/2026) | Exclusion sur actifs et préavis ; exclusion étendue aux terminés | `DATABASE_SCHEMA.md` §4.1 : étendue aux baux terminés | Avant la migration initiale | **Prise le 30/10/2026 (DP-56)** |
 | 42 | Avenants : garde mécanique (ajoutée le 30/10/2026) | Contrôle dans le code ; garde de la base ; règle complète | `DATABASE_SCHEMA.md` §4.4 : garde minimale (aucune échéance payée à partir de la date d'effet) ; la règle complète dépend de la question 1 de §11.1 | Avant la tranche 2 | Ouverte |
-| 43 | Téléphone du locataire unique parmi les fiches non archivées (ajoutée le 30/10/2026) | Unique sur toutes les fiches ; unique parmi les non archivées | `DATABASE_SCHEMA.md` §4.7 : non archivées | Avant la tranche 2 | Ouverte |
+| 43 | Téléphone du locataire unique parmi les fiches non archivées (ajoutée le 30/10/2026) | Unique sur toutes les fiches ; unique parmi les non archivées | `DATABASE_SCHEMA.md` §4.7 : non archivées | Avant la tranche 2 | **Prise le 03/11/2026 (DP-92)** : non archivées |
 | 44 | Comptes rendus : aperçu calculé, version écrite à la validation (ajoutée le 30/10/2026) | Brouillon stocké ; aperçu calculé | `DATABASE_SCHEMA.md` §3 : aperçu calculé, `statement_versions` à la validation | Tranche 5 | Ouverte |
 | 45 | Rôles du plan Propriétaire (ajoutée le 30/10/2026) | Rôles distincts `owner`, `collaborator` ; profils de droits sur les rôles de l'agence | `DATABASE_SCHEMA.md` §3 : valeurs distinctes | Tranche 1 | **Prise le 01/11/2026 (DP-85)** |
 | 46 | Sauvegarde logique sous RLS forcée (ajoutée le 30/10/2026) | Rôle de sauvegarde avec `BYPASSRLS` ; RLS non forcée ; sauvegarde physique seulement | `DATABASE_SCHEMA.md` §6.9 : rôle de sauvegarde si l'hébergeur le permet. À vérifier avec la n° 5 et la n° 21 | Avant de choisir l'hébergeur | **Prise le 30/10/2026 (DP-55)** : rôle de sauvegarde avec `BYPASSRLS` si Neon le permet (prototype b), sinon RLS non forcée ; **condition levée le 31/10/2026 (DP-78)** : rôle `immo_backup` avec `BYPASSRLS` confirmé sur Neon, RLS forcée conservée |
@@ -1166,7 +1304,7 @@ Les 15 décisions de la section 26 du dossier, plus trois ajoutées hors dossier
 | 65 | Opérations longues (import, PDF, export) (ajoutée le 30/10/2026) | `202` et interrogation de `/operations/{id}` ; flux d'événements ; requête qui attend | `API_CONTRACTS.md` §5.4 : interrogation | Tranche 3 | Ouverte |
 | 66 | Erreurs de l'API et textes affichés (ajoutée le 30/10/2026) | `problem+json`, code stable, textes centralisés dans le front ; texte du serveur affiché tel quel | `API_CONTRACTS.md` §2.7 et §3 : code et paramètres du serveur, textes du front | Tranche verticale | **Prise le 31/10/2026 (DP-74)** |
 | 67 | Casse des champs JSON (ajoutée le 30/10/2026) | `snake_case` aligné sur la base ; `camelCase` | `API_CONTRACTS.md` §2.1 : `snake_case` anglais. Va dans le sens de la n° 18 | Avant la tranche verticale | **Prise le 30/10/2026 (DP-56)** |
-| 68 | Téléchargement des PDF et des fichiers (ajoutée le 30/10/2026) | Flux par l'API ; adresse signée du stockage objet | `API_CONTRACTS.md` §5.5 : flux par l'API au pilote | Tranche 3 | Ouverte |
+| 68 | Téléchargement des PDF et des fichiers (ajoutée le 30/10/2026) | Flux par l'API ; adresse signée du stockage objet | `API_CONTRACTS.md` §5.5 : flux par l'API au pilote | Tranche 3 | **Prise le 06/11/2026 (DP-98)** : flux par l’API |
 | 69 | Gestion des erreurs et interdits Rust (ajoutée le 30/10/2026) | `thiserror` dans les bibliothèques et `anyhow` dans le binaire ; `anyhow` partout | `CODING_RULES.md` §4.1 et §4.7 : types d'erreur propres, `unwrap`, `expect`, `panic` et `unsafe` interdits | Avant la tranche verticale | **Prise le 30/10/2026 (DP-56)** |
 | 70 | Bibliothèque de dates (ajoutée le 30/10/2026) | `chrono` avec `chrono-tz` ; `jiff` | `CODING_RULES.md` §4.3 : `chrono` + `chrono-tz` (SQLx), prise en charge de `jiff` à vérifier | Avant la tranche verticale | **Prise le 30/10/2026 (DP-56)** |
 | 71 | Données du front (ajoutée le 30/10/2026) | Client généré et enveloppe fine ; bibliothèque de cache | `CODING_RULES.md` §5.1 : sans bibliothèque de cache au pilote | Tranche verticale | **Prise le 31/10/2026 (DP-74)** |
@@ -1181,7 +1319,7 @@ Les 15 décisions de la section 26 du dossier, plus trois ajoutées hors dossier
 | 80 | Base des tests d'intégration (ajoutée le 30/10/2026) | PostgreSQL réel, base éphémère, rôles de production ; simulation | `TESTING_QA.md` §1.3 : PostgreSQL réel et rôles de production | Avant la tranche verticale | **Prise le 30/10/2026 (DP-56)** |
 | 81 | Profil de test « Android d'entrée de gamme, réseau lent » (ajoutée le 30/10/2026) | Émulation seule ; émulation et appareil réel acheté | `TESTING_QA.md` §8.1 : émulation et un appareil réel. Budget à valider | Tranche verticale | Ouverte |
 | 82 | Chaîne d'intégration continue (ajoutée le 30/10/2026) | Étapes (rapide, intégration, nocturne, avant livraison) ; une seule étape | `TESTING_QA.md` §10 : PR sous 15 minutes, pas de nouvel essai sur les tests d'argent et d'isolation, pas de seuil de couverture au pilote | Tranche verticale | **Prise le 31/10/2026 (DP-74)** |
-| 83 | Tests visuels du PDF (ajoutée le 30/10/2026) | Texte extrait et image de référence approuvée ; revue manuelle seule | `TESTING_QA.md` §6. Dépend de la n° 7 | Après le prototype PDF | Ouverte ; méthode du prototype (texte extrait, planche relue) notée en DP-76, image de référence à décider à l'étape 08 |
+| 83 | Tests visuels du PDF (ajoutée le 30/10/2026) | Texte extrait et image de référence approuvée ; revue manuelle seule | `TESTING_QA.md` §6. Dépend de la n° 7 | Après le prototype PDF | **Prise le 06/11/2026 (DP-98)** : contrôles automatiques et planche approuvée, protégée par l’empreinte |
 | 84 | Gravités et délais de correction (ajoutée le 30/10/2026) | S1 à S4, erreur de montant ou d'isolation toujours S1 ; autres échelles | `TESTING_QA.md` §11 : S1 correctif en 24 h, S2 en 72 h (dossier §20.2). Heures de couverture à fixer | Avant le premier pilote | Ouverte |
 | 85 | Protocole de recette avec les agences (ajoutée le 30/10/2026) | Séances de 90 minutes sur place, animateur et observateur, sans enregistrement de données réelles ; séances à distance | `TESTING_QA.md` §13 | Avant le premier pilote | Ouverte |
 | 86 | Hébergement, grille de choix et coûts (ajoutée le 30/10/2026) | Europe avec PostgreSQL managé ; grand cloud en Afrique ; hébergeur au Burkina Faso | `DEPLOYMENT.md` §1.2 et §1.3 : option (a) sous trois conditions, coûts estimés de 50 à 120 € par mois. Précise les n° 5, 21 et 46 | Avec la n° 5 | Ouverte, en partie tranchée par DP-55 (base) ; serveur, stockage objet, second fournisseur et coûts restent ouverts |

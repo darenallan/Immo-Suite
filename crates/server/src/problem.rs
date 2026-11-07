@@ -420,6 +420,212 @@ impl ApiError {
         e
     }
 
+    /// `422 request.filter_unknown` : filtre hors de la liste blanche de la route (API_CONTRACTS.md §2.5).
+    pub fn filter_unknown() -> Self {
+        Self::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "request.filter_unknown",
+            "Filtre inconnu",
+            "Un problème est survenu. Réessayez.",
+        )
+    }
+
+    /// `403 feature.disabled` : fonction coupée par interrupteur (pièce d'identité au pilote, R-019).
+    /// `422` des règles d'argent (étape 07, `API_CONTRACTS.md` §6.1). Le texte est celui de l'écran ; les paramètres
+    /// (`threshold`, `surplus_amount`) servent à la fenêtre de confirmation.
+    pub fn unprocessable(code: &'static str, params: Option<Value>) -> Self {
+        let (title, detail): (&'static str, &'static str) = match code {
+            "payment.confirmation_required" => (
+                "Confirmation demandée",
+                "Ce montant dépasse le seuil de confirmation de l'organisation. Confirmez le montant pour l'enregistrer.",
+            ),
+            "payment.surplus_not_confirmed" => (
+                "Avance à confirmer",
+                "Le montant dépasse ce qui est dû aujourd'hui. Confirmez que le surplus est une avance.",
+            ),
+            "payment.allocation_invalid" => (
+                "Répartition impossible",
+                "Cette répartition n'est pas possible : vérifiez les montants affectés à chaque échéance.",
+            ),
+            "receipt.recipient_has_no_phone" => (
+                "Numéro manquant",
+                "Ce locataire n'a pas de numéro de téléphone. Imprimez la quittance ou copiez le lien.",
+            ),
+            "idempotency.key_reused_with_different_body" => (
+                "Requête déjà utilisée",
+                "Cette saisie a déjà servi pour un autre contenu. Ouvrez un nouveau formulaire.",
+            ),
+            _ => (
+                "Requête refusée",
+                "Cette action n'est pas possible. Vérifiez la saisie.",
+            ),
+        };
+        let e = Self::new(StatusCode::UNPROCESSABLE_ENTITY, code, title, detail);
+        match params {
+            Some(p) => e.with_params(p),
+            None => e,
+        }
+    }
+
+    /// `400 idempotency.key_missing` : en-tête `Idempotency-Key` absent ou illisible sur une écriture d'argent (DP-49).
+    pub fn idempotency_key_missing() -> Self {
+        Self::new(
+            StatusCode::BAD_REQUEST,
+            "idempotency.key_missing",
+            "Clé manquante",
+            "Un problème est survenu. Rechargez le formulaire et réessayez.",
+        )
+    }
+
+    /// `405 payment.immutable` : un paiement validé ne se modifie ni ne se supprime (R-047).
+    pub fn payment_immutable() -> Self {
+        Self::new(
+            StatusCode::METHOD_NOT_ALLOWED,
+            "payment.immutable",
+            "Paiement non modifiable",
+            "Un paiement enregistré ne se modifie pas. Demandez une correction.",
+        )
+    }
+
+    pub fn feature_disabled() -> Self {
+        Self::new(
+            StatusCode::FORBIDDEN,
+            "feature.disabled",
+            "Fonction indisponible",
+            "Cette fonction n'est pas disponible pour votre organisation.",
+        )
+    }
+
+    /// `409` du patrimoine (étape 05, catalogue d'`API_CONTRACTS.md` §3.4, DP-92). Le détail est le texte de l'écran ; les
+    /// paramètres (`conflict`, `count`) permettent au front de proposer l'action suivante.
+    pub fn conflict(code: &'static str, params: Option<Value>) -> Self {
+        let count = params
+            .as_ref()
+            .and_then(|p| p.get("count"))
+            .and_then(Value::as_i64)
+            .unwrap_or(0);
+        let name = params
+            .as_ref()
+            .and_then(|p| p.pointer("/conflict/display_name"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let (title, detail): (&'static str, String) = match code {
+            "unit.reference_duplicate" => (
+                "Référence déjà utilisée",
+                "Cette référence est déjà utilisée dans ce bien.".into(),
+            ),
+            "tenant.phone_duplicate" => (
+                "Numéro déjà enregistré",
+                format!("Un locataire avec ce numéro existe déjà : {name}."),
+            ),
+            "tenant.archived" => (
+                "Fiche archivée",
+                "Ce locataire est archivé : sa fiche ne se modifie plus.".into(),
+            ),
+            "tenant.merge_invalid" => (
+                "Fusion impossible",
+                "Ces deux fiches ne peuvent pas être fusionnées (même fiche, fiche archivée ou déjà fusionnée).".into(),
+            ),
+            "property.archived" => ("Bien archivé", "Ce bien est archivé : il ne se modifie plus.".into()),
+            "unit.archived" => ("Lot archivé", "Ce lot est archivé : il ne se modifie plus.".into()),
+            "owner.archived" => (
+                "Mandant archivé",
+                "Ce mandant est archivé : sa fiche ne se modifie plus.".into(),
+            ),
+            "owner.has_properties" => (
+                "Mandant propriétaire de biens",
+                format!(
+                    "Ce mandant est propriétaire de {count} bien{}. Changez leur propriétaire avant de l'archiver.",
+                    if count > 1 { "s" } else { "" }
+                ),
+            ),
+            "owner.is_self" => (
+                "Fiche du propriétaire",
+                "Votre propre fiche de propriétaire ne s'archive pas.".into(),
+            ),
+            "lease.overlap" => {
+                let from = params
+                    .as_ref()
+                    .and_then(|p| p.get("start_date"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let to = params
+                    .as_ref()
+                    .and_then(|p| p.get("end_date"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("sans fin")
+                    .to_string();
+                (
+                    "Bail en chevauchement",
+                    format!("Ce lot a déjà un bail du {from} au {to}. Terminez-le ou choisissez d'autres dates."),
+                )
+            }
+            "lease.not_draft" => (
+                "Bail activé",
+                "Ce bail est déjà activé. Utilisez un avenant pour le modifier.".into(),
+            ),
+            "lease.not_in_progress" => ("Bail non en cours", "Ce bail n'est pas en cours.".into()),
+            "lease.kind_not_allowed" => (
+                "Type de bail",
+                "Ce type de bail ne correspond pas à l'usage du lot.".into(),
+            ),
+            "lease.active_exists" => (
+                "Bail en cours",
+                "Ce locataire a un bail en cours. Terminez-le avant d'archiver la fiche.".into(),
+            ),
+            "lease.amendment_same_date" => ("Avenant", "Un avenant existe déjà à cette date d'effet.".into()),
+            "lease.amendment_before_start" => ("Avenant", "La date d'effet doit suivre le début du bail.".into()),
+            "lease.end_date_only_later" => (
+                "Date de fin",
+                "Une prolongation ne peut que reculer la date de fin.".into(),
+            ),
+            "unit.has_active_lease" => (
+                "Bail en cours",
+                "Ce lot a un bail actif. Terminez le bail avant d'archiver le lot.".into(),
+            ),
+            "unit.under_works" => (
+                "Lot en travaux",
+                "Ce lot est en travaux. Remettez-le à « vacant » pour activer un bail.".into(),
+            ),
+            "receipt.pdf_not_ready" => (
+                "PDF en préparation",
+                "Le PDF de la quittance est en préparation. Un nouvel essai est en cours.".into(),
+            ),
+            "payment.external_ref_duplicate" => (
+                "Référence déjà utilisée",
+                "Ce paiement semble déjà enregistré : cette référence a déjà été saisie. Vérifiez, puis confirmez si c'est un autre paiement.".into(),
+            ),
+            "payment.lease_not_in_progress" => ("Bail non en cours", "Ce bail n'est pas en cours : aucun encaissement possible.".into()),
+            "payment.stale_allocation" => (
+                "Répartition dépassée",
+                "Les échéances ont changé entre-temps. Vérifiez la nouvelle répartition proposée.".into(),
+            ),
+            "installment.line_has_payments" => (
+                "Ligne payée",
+                "Cette ligne porte un paiement : elle ne peut pas être annulée.".into(),
+            ),
+            "lease.amendment_paid_installment" => (
+                "Avenant impossible",
+                "Une échéance à partir de cette date est déjà payée : l'avenant ne peut pas être rétroactif.".into(),
+            ),
+            "unit.works_requires_vacant" => (
+                "Lot occupé",
+                "Seul un lot vacant peut être mis en travaux. Ajoutez plutôt une intervention.".into(),
+            ),
+            _ => (
+                "Conflit",
+                "Cette action n'est pas possible dans l'état actuel. Rechargez la page.".into(),
+            ),
+        };
+        let e = Self::new(StatusCode::CONFLICT, code, title, detail);
+        match params {
+            Some(p) => e.with_params(p),
+            None => e,
+        }
+    }
+
     /// Traduction d'une erreur du service d'identité en erreur d'API stable.
     pub fn from_service(e: immo_app::identity::error::ServiceError, request_id: &str) -> Self {
         use immo_app::identity::error::ServiceError as S;
@@ -444,6 +650,10 @@ impl ApiError {
             S::VersionRequired => Self::version_required(),
             S::BadCursor => Self::cursor_invalid(),
             S::TotpInvalid => Self::totp_invalid(),
+            S::Conflict { code, params } => Self::conflict(code, params),
+            S::PlanUnavailable => Self::plan_unavailable(),
+            S::FeatureDisabled => Self::feature_disabled(),
+            S::Unprocessable { code, params } => Self::unprocessable(code, params),
         };
         api.with_request_id(request_id)
     }

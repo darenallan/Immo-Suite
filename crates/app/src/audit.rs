@@ -46,6 +46,7 @@ audit_actions! {
     ReceiptPdfFailed => "receipt.pdf_failed",
     // Baux
     LeaseCreated => "lease.created",
+    LeaseUpdated => "lease.updated",
     LeaseActivated => "lease.activated",
     LeaseAmended => "lease.amended",
     LeaseNoticeGiven => "lease.notice_given",
@@ -54,8 +55,15 @@ audit_actions! {
     InstallmentLineAdded => "installment.line_added",
     InstallmentLineVoided => "installment.line_voided",
     // Patrimoine
+    PropertyCreated => "property.created",
+    PropertyUpdated => "property.updated",
+    PropertyArchived => "property.archived",
+    UnitCreated => "unit.created",
+    UnitUpdated => "unit.updated",
     UnitWorksSet => "unit.works_set",
     UnitArchived => "unit.archived",
+    OwnerCreated => "owner.created",
+    OwnerArchived => "owner.archived",
     TenantCreated => "tenant.created",
     TenantUpdated => "tenant.updated",
     TenantMerged => "tenant.merged",
@@ -233,7 +241,8 @@ mod tests {
                 "{code}"
             );
         }
-        assert_eq!(AuditAction::ALL.len(), 62);
+        // 62 jusqu'à l'étape 04, 7 ajoutées à l'étape 05 (DP-92), 1 à l'étape 06 (DP-94)
+        assert_eq!(AuditAction::ALL.len(), 70);
     }
 
     #[test]

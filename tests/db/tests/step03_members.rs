@@ -945,7 +945,11 @@ async fn lots_assignes_liste_vide_seulement_et_portee_de_l_agent() {
         &[],
     )
     .await;
-    assert_eq!(some.json()["params"]["reason"], "units_unavailable");
+    assert_eq!(
+        some.json()["params"]["reason"],
+        "unit_ids",
+        "étape 05 : un lot inconnu est refusé (DP-92)"
+    );
     let empty = req(&a, &g, Method::PUT, &path, Some(json!({ "unit_ids": [] })), &[]).await;
     assert_eq!(empty.json()["unit_ids"], json!([]));
 
@@ -953,6 +957,11 @@ async fn lots_assignes_liste_vide_seulement_et_portee_de_l_agent() {
     a.db.admin
         .execute(sqlx::AssertSqlSafe(format!(
             "UPDATE memberships SET role = 'field_agent' WHERE org_id = '{ORG_A}' AND user_id = '{DEUX}';
+             -- étape 05 : les 25 lots existent (clé unit_assignments → units)
+             INSERT INTO properties (id, org_id, name) VALUES ('f0000000-0000-4000-8000-0000000000aa', '{ORG_A}', 'Bien d''essai');
+             INSERT INTO units (id, org_id, property_id, reference, kind, usage)
+               SELECT ('f0000000-0000-4000-8000-0000000000' || lpad(n::text, 2, '0'))::uuid, '{ORG_A}', 'f0000000-0000-4000-8000-0000000000aa',
+                      'L' || n, 'room', 'residential' FROM generate_series(1, 25) n;
              INSERT INTO unit_assignments (org_id, unit_id, user_id, assigned_by)
                SELECT '{ORG_A}', ('f0000000-0000-4000-8000-0000000000' || lpad(n::text, 2, '0'))::uuid, '{DEUX}', '{UN}' FROM generate_series(1, 10) n;"
         )))
